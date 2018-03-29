@@ -1,7 +1,6 @@
 import { BrowserModule } from '@angular/platform-browser';
 import { NgModule } from '@angular/core';
 import { HttpClientModule } from '@angular/common/http';
-import { EsriLoaderModule } from 'angular-esri-loader';
 import { RouterModule, Routes } from '@angular/router';
 
 import { AppComponent } from './app.component';
@@ -10,7 +9,7 @@ import { ObservableTestsComponent } from './observable-tests/observable-tests.co
 import { WebsocketTestsComponent } from './websocket-tests/websocket-tests.component';
 
 const appRoutes: Routes = [
-  { path: 'esri-map', component: EsriMapComponent },
+  { path: 'esri-map/:demoType', component: EsriMapComponent },
   { path: 'observable-tests', component: ObservableTestsComponent },
   { path: 'websocket-tests', component: WebsocketTestsComponent },
   // {
@@ -39,7 +38,6 @@ const appRoutes: Routes = [
     ),
     BrowserModule,
     HttpClientModule,
-    EsriLoaderModule
   ],
   providers: [],
   bootstrap: [AppComponent]
