@@ -57,13 +57,16 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
   private readonly dataChunkSize = 1000;
   private readonly hideESRIAttribution = false;
 
+  // ToDo: Move to config settings along with service url - see s-one
+  private readonly extCustomerDashArcGISToken = 'O7iiomqrpZXsOGoQdjnOSbd9E-Kw_1MX3xqACymA05DCT325Q8NR750UvRGmNZHdFc2r-g6rOLLVhNqJa_cYKeuEgYGkkYTTTPj6ksZ7U-A.';
+
   private usCitiesFeatureLayer: any;
   private usCountiesFeatureLayer: any;
   private usStatesFeatureLayer: any;
   private usHighwaysFeatureLayer: any;
   private dcpPlantsFeatureLayer: any;
   private dcpBoostersFeatureLayer: any;
-  // private dcpMetersFeatureLayer: any;
+  private dcpMetersFeatureLayer: any;
   private dcpPipelinesFeatureLayer: any;
 
   private demoType: string;
@@ -117,10 +120,17 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
     this.showProgressBar();
 
     // United States Extent (WKID: 102100)
-    const xMin = -14601853.95;
-    const yMin = 1796785.96;
-    const xMax = -6814979.53;
-    const yMax = 7371348.5;
+    // const xMin = -14601853.95;
+    // const yMin = 1796785.96;
+    // const xMax = -6814979.53;
+    // const yMax = 7371348.5;
+    // const wkid = 102100;
+
+    // Houston, TX Extent (WKID: 102100)
+    const xMin = -1.0787061554464137E7;
+    const yMin = 3277462.903741703;
+    const xMax = -1.0483374918996217E7;
+    const yMax = 3644152.380667683;
     const wkid = 102100;
 
     const homeExtent = new this.Extent({
@@ -143,7 +153,7 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
       basemap: baseMap
     });
 
-    const zoom = 4;
+    const zoom = 8; // 7; // 6; // 5; // 4; // 3;
 
     this.mapView = new this.MapView({
       container: this.mapViewContainer.nativeElement,
@@ -232,6 +242,11 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
       case 'workforce-demo':
         this.loadWorkforceFeatureLayers();
         break;
+
+      // todo: wire up leak log demo that displays leaks on the map and allows
+      // a user to click on them, open a dialog box, enter details & attachments (logging details)
+      // and submit the edit back to the service/backend api - got here
+      // need to troll the portal for the leak api or request the url & creds from mark/catherine
     }
   }
 
@@ -243,9 +258,10 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
   }
 
   private loadDCPFeatureLayers = (): void => {
-    this.loadDCPMeters(null, true);
+    this.loadDCPMeters();
     this.loadDCPPlants();
     this.loadDCPBoosters();
+    this.loadDCPPipelines();
   }
 
   private loadWorkforceFeatureLayers = (): void => {
@@ -329,8 +345,12 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
   private loadDCPPlants = (): void => {
     this.showProgressBar();
 
+    const url = 'https://gistest.dcpmidstream.com/arcgis/rest/services/Ext_CustomerDashboard/Ext_Dashboard_Layers/MapServer/0';
+
+    console.log('plants feature layer url', url);
+
     this.dcpPlantsFeatureLayer = new this.FeatureLayer({
-      url: 'https://gistest.dcpmidstream.com/arcgis/rest/services/Ext_CustomerDashboard/Ext_Dashboard_Layers/MapServer/0',
+      url: url,
       outFields: ['*'],
       visible: true,
       popupTemplate: { // autocasts as new PopupTemplate()
@@ -456,10 +476,17 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
   private loadDCPBoosters = (): void => {
     this.showProgressBar();
 
+    // const url = 'https://gistest.dcpmidstream.com/arcgis/rest/services/Ext_CustomerDashboard/Ext_Dashboard_Layers/MapServer/1';
+    const url = 'https://gistest.dcpmidstream.com/arcgis/rest/services/Ext_CustomerDashboard/Ext_Dashboard_Layers/MapServer/1'; // ?token=' + this.extCustomerDashArcGISToken;
+    // const url = 'https://api.dcpdigital.com/arcgis-test/Ext_CustomerDashboard/Ext_Dashboard_Layers/MapServer/1/?subscription-key=80bf224db0844a1aaeb564e2147e55dd';
+
+    console.log('booster feature layer url', url);
+
     this.dcpBoostersFeatureLayer = new this.FeatureLayer({
-      url: 'https://gistest.dcpmidstream.com/arcgis/rest/services/Ext_CustomerDashboard/Ext_Dashboard_Layers/MapServer/1',
+      url: url,
       outFields: ['*'],
       visible: true,
+      // token: this.extCustomerDashArcGISToken, // todo: figure out why this token isnt working
       popupTemplate: { // autocasts as new PopupTemplate()
         // title: "<font color='#008000'>DCP Boosters</font>",
         title: 'DCP Booster',
@@ -580,7 +607,88 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
     });
   }
 
-  private loadDCPMeters = (meterNumbers, renderPipelines): void => {
+  private loadDCPMeters = (): void => {
+    this.showProgressBar();
+
+    const url = 'https://gistest.dcpmidstream.com/arcgis/rest/services/Ext_CustomerDashboard/Ext_Dashboard_Layers/MapServer/2';
+
+    console.log('meters feature layer url', url);
+
+    this.dcpMetersFeatureLayer = new this.FeatureLayer({
+      url: url,
+      outFields: ['*'],
+      visible: true,
+      popupTemplate: { // autocasts as new PopupTemplate()
+        // title: "<font color='#008000'>DCP Meters</font>",
+        title: 'DCP Meter',
+
+        // Set content elements in the order to display.
+        // The first element displayed here is the fieldInfos.
+        content: [
+          {
+            // It is also possible to set the fieldInfos outside of the content
+            // directly in the popupTemplate. If no fieldInfos is specifically set
+            // in the content, it defaults to whatever may be set within the popupTemplate.
+            type: 'fields',
+            fieldInfos: [
+              {
+                fieldName: 'METER_NUMBER',
+                visible: true,
+                label: 'Meter Number',
+                format: {
+                  places: 0,
+                  digitSeparator: true
+                }
+              },
+              {
+                fieldName: 'METER_NAME',
+                visible: true,
+                label: 'Meter Name',
+                format: {
+                  places: 0,
+                  digitSeparator: true
+                }
+              },
+              {
+                fieldName: 'STATUS',
+                visible: true,
+                label: 'Status',
+                format: {
+                  places: 0,
+                  digitSeparator: true
+                }
+              },
+              {
+                fieldName: 'METER_STATUS',
+                visible: true,
+                label: 'Meter Status'
+              },
+              {
+                fieldName: 'COMPANY_NAME',
+                visible: true,
+                label: 'Company Name'
+              },
+              {
+                fieldName: 'SYSTEM',
+                visible: true,
+                label: 'System'
+              }
+            ]
+          },
+        ]
+      },
+    });
+
+    this.map.add(this.dcpMetersFeatureLayer);
+
+    this.dcpMetersFeatureLayer.when(() => {
+      console.log('dcp meters feature layer loaded!');
+      // this.toggleLayerVisibility(this.dcpMetersFeatureLayer, true);
+      this.hideProgressBar();
+    });
+  }
+
+  private loadDCPMetersOLD = (meterNumbers, renderPipelines): void => {
     this.showProgressBar();
 
     let meterCount = 0;
@@ -869,9 +977,15 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
   }
 
   private loadDCPPipelines = (): void => {
+    this.showProgressBar();
+
+    const url = 'https://gistest.dcpmidstream.com/arcgis/rest/services/Ext_CustomerDashboard/Ext_Dashboard_Layers/MapServer/3';
+
+    console.log('pipelnes feature layer url', url);
+
     // todo: wire up load time metrics for these methods
     this.dcpPipelinesFeatureLayer = new this.FeatureLayer({
-      url: 'https://gistest.dcpmidstream.com/arcgis/rest/services/Ext_CustomerDashboard/Ext_Dashboard_Layers/MapServer/3',
+      url: url,
       outFields: ['*'],
       visible: true,
       popupTemplate: { // autocasts as new PopupTemplate()
