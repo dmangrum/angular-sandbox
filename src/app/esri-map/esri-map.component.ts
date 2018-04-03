@@ -48,6 +48,8 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
   private Zoom: any;
   private Viewpoint: any;
   private LayerList: any;
+  private IdentityManager: any;
+  private ServerInfo: any;
 
   private mapView: any;
   // private sceneView: any;
@@ -58,16 +60,7 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
   private readonly hideESRIAttribution = false;
 
   // ToDo: Move to config settings along with service url - see s-one
-  private readonly extCustomerDashArcGISToken = 'O7iiomqrpZXsOGoQdjnOSbd9E-Kw_1MX3xqACymA05DCT325Q8NR750UvRGmNZHdFc2r-g6rOLLVhNqJa_cYKeuEgYGkkYTTTPj6ksZ7U-A.';
-
-  private usCitiesFeatureLayer: any;
-  private usCountiesFeatureLayer: any;
-  private usStatesFeatureLayer: any;
-  private usHighwaysFeatureLayer: any;
-  private dcpPlantsFeatureLayer: any;
-  private dcpBoostersFeatureLayer: any;
-  private dcpMetersFeatureLayer: any;
-  private dcpPipelinesFeatureLayer: any;
+  private readonly extCustomerDashArcGISToken = 'O7iiomqrpZXsOGoQdjnOSdXx-lBEKkk9cUvdlgsesAVAy-pPJbgc1LDKkdVOH3Nv4rvJRIrNO-51kKMTEH5kTqfkFu6E9ETruZlplNv7fI38e2X_d_9hzS9SmPIvVA6x';
 
   private demoType: string;
   private sub: any;
@@ -84,12 +77,13 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
       'esri/layers/support/Field', 'esri/PopupTemplate', 'esri/symbols/PictureMarkerSymbol',
       'esri/widgets/Home', 'esri/widgets/Legend', 'esri/widgets/LayerList', 'esri/widgets/Zoom',
       'esri/widgets/Locate', 'esri/Viewpoint', 'esri/geometry/Circle',
-      'esri/symbols/SimpleFillSymbol', 'esri/tasks/support/Query', 'esri/geometry/support/webMercatorUtils'], options).then(
+      'esri/symbols/SimpleFillSymbol', 'esri/tasks/support/Query', 'esri/geometry/support/webMercatorUtils',
+      'esri/identity/IdentityManager', 'esri/identity/ServerInfo'], options).then(
         (
           [
             Map, MapView, Graphic, Point, Extent, FeatureLayer, ScaleBar, Compass, Field, PopupTemplate,
             PictureMarkerSymbol, Home, Legend, LayerList, Zoom, Locate, Viewpoint, Circle, SimpleFillSymbol, Query,
-            WebMercatorUtils
+            WebMercatorUtils, IdentityManager, ServerInfo
           ]
         ) => {
           this.Map = Map; this.MapView = MapView; this.Graphic = Graphic; this.Point = Point; this.Extent = Extent;
@@ -98,6 +92,7 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
           this.Home = Home; this.Legend = Legend; this.LayerList = LayerList; this.Zoom = Zoom; this.Locate = Locate;
           this.Viewpoint = Viewpoint; this.Circle = Circle;
           this.SimpleFillSymbol = SimpleFillSymbol; this.Query = Query; this.WebMercatorUtils = WebMercatorUtils;
+          this.IdentityManager = IdentityManager; this.ServerInfo = ServerInfo;
 
           this.initializeMap();
         });
@@ -127,10 +122,17 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
     // const wkid = 102100;
 
     // Houston, TX Extent (WKID: 102100)
-    const xMin = -1.0787061554464137E7;
-    const yMin = 3277462.903741703;
-    const xMax = -1.0483374918996217E7;
-    const yMax = 3644152.380667683;
+    // const xMin = -1.0787061554464137E7;
+    // const yMin = 3277462.903741703;
+    // const xMax = -1.0483374918996217E7;
+    // const yMax = 3644152.380667683;
+    // const wkid = 102100;
+
+    // Denver, CO Extent (WKID: 102100)
+    const xMin = -1.1747632951692317E7;
+    const yMin = 4943967.33700046;
+    const xMax = -1.1738269415727396E7;
+    const yMax = 4950617.358461262;
     const wkid = 102100;
 
     const homeExtent = new this.Extent({
@@ -153,7 +155,7 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
       basemap: baseMap
     });
 
-    const zoom = 8; // 7; // 6; // 5; // 4; // 3;
+    const zoom = 7; // 7; // 6; // 5; // 4; // 3;
 
     this.mapView = new this.MapView({
       container: this.mapViewContainer.nativeElement,
@@ -200,7 +202,7 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
       view: this.mapView
     });
 
-    this.mapView.ui.add(legend, 'bottom-right');
+    this.mapView.ui.add(legend, 'bottom-left');
 
     const scalebar = new this.ScaleBar ({
       view: this.mapView
@@ -237,17 +239,76 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
         this.loadUSFeatureLayers();
         break;
       case 'dcp-demo':
-        this.loadDCPFeatureLayers();
+        // this.authenticateUser();
+        this.loadDCPFeatureLayers(true, true, true, true);
         break;
       case 'workforce-demo':
+        // this.authenticateUser();
+        this.loadDCPFeatureLayers(true, true, true, true);
         this.loadWorkforceFeatureLayers();
         break;
-
-      // todo: wire up leak log demo that displays leaks on the map and allows
+      case 'gatekeeper-demo':
+        alert('here');
+        // this.authenticateUser();
+        // this.loadDCPFeatureLayers(true, true, true, true);
+        break;
+      // ToDo: wire up leak log demo that displays leaks on the map and allows
       // a user to click on them, open a dialog box, enter details & attachments (logging details)
-      // and submit the edit back to the service/backend api - got here
+      // and submit the edit back to the service/backend api 
       // need to troll the portal for the leak api or request the url & creds from mark/catherine
     }
+  }
+
+  private authenticateUser = (): void => {
+    // ToDo: Figure out how to authenticate against enterprise on prem server
+    // const identityManager = new this.IdentityManager();
+
+    // const url = 'https://utility.arcgis.com/usrsvcs/servers/0e696ad6daf74ad194fc9530fc6af6f3/rest/services/Ext_DCP_Demo/Demo_DCP_Base/MapServer/';
+
+    // const serverInfo = this.IdentityManager.findServerInfo(url);
+
+
+    const serverInfos = [];
+
+    const serverInfo = new this.ServerInfo();
+    serverInfo.server = 'https://gistest.dcpmidstream.com/';
+    serverInfo.tokenServiceUrl = 'https://gistest.dcpmidstream.com/arcgis/tokens/generateToken';
+
+    serverInfos.push(serverInfo);
+
+    // const serverInfo = new this.ServerInfo();
+    // serverInfo.server = "http://services8.arcgis.com";
+    // serverInfo.tokenServiceUrl = "https://www.arcgis.com/sharing/generateToken";
+
+
+
+    this.IdentityManager.registerServers(serverInfos);
+
+
+    // ToDo: Figure out how to generate token for all requests in session along with how to cache credentails for future use.
+
+    console.log('identity manager', this.IdentityManager);
+
+    const userId = 'dbmangrum_dev';
+    const password = '******'; // todo: wire up credential prompt and caching
+
+    const userInfo = {
+      username: userId,
+      password: password
+    };
+
+    console.log('dalton was here');
+
+    this.IdentityManager.generateToken(serverInfo, userInfo).when((response) => {
+      console.log('generate token response', response);
+      // this.IdentifyManager.registerToken({
+      //   server: serverInfo.server,
+      //   userId: userId,
+      //   token: response.token,
+      //   expires: response.expires,
+      //   ssl: response.ssl
+      // });
+    });
   }
 
   private loadUSFeatureLayers = (): void => {
@@ -257,33 +318,42 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
     this.loadUSCities();
   }
 
-  private loadDCPFeatureLayers = (): void => {
-    this.loadDCPMeters();
-    this.loadDCPPlants();
-    this.loadDCPBoosters();
-    this.loadDCPPipelines();
+  private loadDCPFeatureLayers = (loadMeters?, loadPlants?, loadBoosters?, loadPipelines?): void => {
+    if (loadMeters) {
+      this.loadDCPMeters();
+    }
+    if (loadPlants) {
+      this.loadDCPPlants();
+    }
+    if (loadBoosters) {
+      this.loadDCPBoosters();
+    }
+    if (loadPipelines) {
+      this.loadDCPPipelines();
+    }
   }
 
   private loadWorkforceFeatureLayers = (): void => {
-    // this.loadWorkers();
-    // this.loadDispatchers();
-    // this.loadAssignments();
+    // this.loadWorkforceBaselayers();
+    // this.loadWorkforceDispatchers();
+    this.loadWorkforceWorkers();
+    this.loadWorkforceAssignments();
   }
 
   private loadUSCities = (): void => {
     this.showProgressBar();
 
-    this.usCitiesFeatureLayer = new this.FeatureLayer({
+    const featureLayer = new this.FeatureLayer({
       url: 'https://sampleserver6.arcgisonline.com/arcgis/rest/services/USA/MapServer/0',
       outFields: ['*'],
       visible: true,
     });
 
-    this.map.add(this.usCitiesFeatureLayer);
+    this.map.add(featureLayer);
 
-    this.usCitiesFeatureLayer.when(() => {
+    featureLayer.when(() => {
       console.log('us cities feature layer loaded!');
-      // this.toggleLayerVisibility(this.usCitiesFeatureLayer, true);
+      // this.toggleLayerVisibility(featureLayer, true);
       this.hideProgressBar();
     });
   }
@@ -291,17 +361,17 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
   private loadUSHighways = (): void => {
     this.showProgressBar();
 
-    this.usHighwaysFeatureLayer = new this.FeatureLayer({
+    const featureLayer = new this.FeatureLayer({
       url: 'https://sampleserver6.arcgisonline.com/arcgis/rest/services/USA/MapServer/1',
       outFields: ['*'],
       visible: true,
     });
 
-    this.map.add(this.usHighwaysFeatureLayer);
+    this.map.add(featureLayer);
 
-    this.usHighwaysFeatureLayer.when(() => {
+    featureLayer.when(() => {
       console.log('us highways feature layer loaded!');
-      // this.toggleLayerVisibility(this.usHighwaysFeatureLayer, true);
+      // this.toggleLayerVisibility(featureLayer, true);
       this.hideProgressBar();
     });
   }
@@ -309,17 +379,17 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
   private loadUSStates = (): void => {
     this.showProgressBar();
 
-    this.usStatesFeatureLayer = new this.FeatureLayer({
+    const featureLayer = new this.FeatureLayer({
       url: 'https://sampleserver6.arcgisonline.com/arcgis/rest/services/USA/MapServer/2',
       outFields: ['*'],
       visible: true,
     });
 
-    this.map.add(this.usStatesFeatureLayer);
+    this.map.add(featureLayer);
 
-    this.usStatesFeatureLayer.when(() => {
+    featureLayer.when(() => {
       console.log('us states feature layer loaded!');
-      // this.toggleLayerVisibility(this.usStatesFeatureLayer, true);
+      // this.toggleLayerVisibility(featureLayer, true);
       this.hideProgressBar();
     });
   }
@@ -327,17 +397,17 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
   private loadUSCounties = (): void => {
     this.showProgressBar();
 
-    this.usCountiesFeatureLayer = new this.FeatureLayer({
+    const featureLayer = new this.FeatureLayer({
       url: 'https://sampleserver6.arcgisonline.com/arcgis/rest/services/USA/MapServer/3',
       outFields: ['*'],
       visible: true,
     });
 
-    this.map.add(this.usCountiesFeatureLayer);
+    this.map.add(featureLayer);
 
-    this.usCountiesFeatureLayer.when(() => {
+    featureLayer.when(() => {
       console.log('us counties feature layer loaded!');
-      // this.toggleLayerVisibility(this.usCountiesFeatureLayer, true);
+      // this.toggleLayerVisibility(featureLayer, true);
       this.hideProgressBar();
     });
   }
@@ -349,7 +419,7 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
 
     console.log('plants feature layer url', url);
 
-    this.dcpPlantsFeatureLayer = new this.FeatureLayer({
+    const featureLayer = new this.FeatureLayer({
       url: url,
       outFields: ['*'],
       visible: true,
@@ -464,11 +534,11 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
       },
     });
 
-    this.map.add(this.dcpPlantsFeatureLayer);
+    this.map.add(featureLayer);
 
-    this.dcpPlantsFeatureLayer.when(() => {
+    featureLayer.when(() => {
       console.log('dcp plants feature layer loaded!');
-      // this.toggleLayerVisibility(this.dcpPlantsFeatureLayer, true);
+      // this.toggleLayerVisibility(featureLayer, true);
       this.hideProgressBar();
     });
   }
@@ -482,7 +552,7 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
 
     console.log('booster feature layer url', url);
 
-    this.dcpBoostersFeatureLayer = new this.FeatureLayer({
+    const featureLayer = new this.FeatureLayer({
       url: url,
       outFields: ['*'],
       visible: true,
@@ -598,11 +668,11 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
       },
     });
 
-    this.map.add(this.dcpBoostersFeatureLayer);
+    this.map.add(featureLayer);
 
-    this.dcpBoostersFeatureLayer.when(() => {
+    featureLayer.when(() => {
       console.log('dcp boosters feature layer loaded!');
-      // this.toggleLayerVisibility(this.dcpBoostersFeatureLayer, true);
+      // this.toggleLayerVisibility(featureLayer, true);
       this.hideProgressBar();
     });
   }
@@ -614,10 +684,11 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
 
     console.log('meters feature layer url', url);
 
-    this.dcpMetersFeatureLayer = new this.FeatureLayer({
+    const featureLayer = new this.FeatureLayer({
       url: url,
       outFields: ['*'],
       visible: true,
+      token: this.extCustomerDashArcGISToken,
       popupTemplate: { // autocasts as new PopupTemplate()
         // title: "<font color='#008000'>DCP Meters</font>",
         title: 'DCP Meter',
@@ -679,11 +750,11 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
       },
     });
 
-    this.map.add(this.dcpMetersFeatureLayer);
+    this.map.add(featureLayer);
 
-    this.dcpMetersFeatureLayer.when(() => {
+    featureLayer.when(() => {
       console.log('dcp meters feature layer loaded!');
-      // this.toggleLayerVisibility(this.dcpMetersFeatureLayer, true);
+      // this.toggleLayerVisibility(featureLayer, true);
       this.hideProgressBar();
     });
   }
@@ -984,7 +1055,7 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
     console.log('pipelnes feature layer url', url);
 
     // todo: wire up load time metrics for these methods
-    this.dcpPipelinesFeatureLayer = new this.FeatureLayer({
+    const featureLayer = new this.FeatureLayer({
       url: url,
       outFields: ['*'],
       visible: true,
@@ -1112,11 +1183,728 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
       },
     });
 
-    this.map.add(this.dcpPipelinesFeatureLayer, -1000);
+    this.map.add(featureLayer, -1000);
 
-    this.dcpPipelinesFeatureLayer.when(() => {
+    featureLayer.when(() => {
       console.log('dcp pipelines feature layer loaded!');
-      // this.toggleLayerVisibility(this.dcpPipelinesFeatureLayer, true);
+      // this.toggleLayerVisibility(featureLayer, true);
+      this.hideProgressBar();
+    });
+  }
+
+  private loadWorkforceBaselayers = (): void => {
+    this.showProgressBar();
+
+    // ToDo: Figure out how to load the workforce base layers via the map server url.
+
+    const url = 'https://utility.arcgis.com/usrsvcs/servers/0e696ad6daf74ad194fc9530fc6af6f3/rest/services/Ext_DCP_Demo/Demo_DCP_Base/MapServer/';
+
+    console.log('workforce baselayers feature layer url', url);
+
+    const featureLayer = new this.FeatureLayer({
+      url: url,
+      outFields: ['*'],
+      visible: true,
+      popupTemplate: { // autocasts as new PopupTemplate()
+        // title: "<font color='#008000'>DCP Plants</font>",
+        title: 'Workforce Base Layers',
+
+        // Set content elements in the order to display.
+        // The first element displayed here is the fieldInfos.
+        // content: [
+        //   {
+        //     // It is also possible to set the fieldInfos outside of the content
+        //     // directly in the popupTemplate. If no fieldInfos is specifically set
+        //     // in the content, it defaults to whatever may be set within the popupTemplate.
+        //     type: 'fields',
+        //     fieldInfos: [
+        //       {
+        //         fieldName: 'PLANT_ID',
+        //         visible: true,
+        //         label: 'Plant ID',
+        //         format: {
+        //           places: 0,
+        //           digitSeparator: true
+        //         }
+        //       },
+        //       {
+        //         fieldName: 'NAME',
+        //         visible: true,
+        //         label: 'Plant Name',
+        //         format: {
+        //           places: 0,
+        //           digitSeparator: true
+        //         }
+        //       },
+        //       {
+        //         fieldName: 'TYPE',
+        //         visible: true,
+        //         label: 'Plant Type',
+        //         format: {
+        //           places: 0,
+        //           digitSeparator: true
+        //         }
+        //       },
+        //       {
+        //         fieldName: 'STATUS',
+        //         visible: true,
+        //         label: 'Plant Status'
+        //       },
+        //       {
+        //         fieldName: 'LONGITUDE',
+        //         visible: true,
+        //         label: 'Longitude'
+        //       },
+        //       {
+        //         fieldName: 'LATITUDE',
+        //         visible: true,
+        //         label: 'Latitude'
+        //       }
+        //     ]
+        //   },
+        //   {
+        //     // You can also set a descriptive text element. This element
+        //     // uses an attribute from the featurelayer which displays a
+        //     // sentence giving the total amount of trees value within a
+        //     // specified census block. Text elements can only be set within the content.
+        //     type: "text",
+        //     text: "There are {Point_Count} trees within census block {BLOCKCE10}"
+        //   },
+        //   {
+        //     // You can set a media element within the popup as well. This
+        //     // can be either an image or a chart. You specify this within
+        //     // the mediaInfos. The following creates a pie chart in addition
+        //     // to two separate images. The chart is also set up to work with
+        //     // related tables. Similar to text elements, media can only be set within the content.
+        //     type: "media",
+        //     mediaInfos: [
+        //       {
+        //         title: "<b>Count by type</b>",
+        //         type: "pie-chart",
+        //         caption: "",
+        //         value: {
+        //           theme: "Grasshopper",
+        //           fields: ["relationships/0/Point_Count_COMMON"],
+        //           normalizeField: null,
+        //           tooltipField: "relationships/0/COMMON"
+        //         }
+        //       },
+        //       {
+        //         title: "<b>Welcome to Beverly Hills</b>",
+        //         type: "image",
+        //         value: {
+        //           sourceURL: "https://www.beverlyhills.org/cbhfiles/storage/files/13203374121770673849/122707_039r_final.jpg"
+        //         }
+        //       },
+        //       {
+        //         title: "<b>Palm tree lined street</b>",
+        //         type: "image",
+        //         value: {
+        //           sourceURL: "https://cdn.loc.gov/service/pnp/highsm/21600/21679r.jpg"
+        //         }
+        //       }
+        //     ]
+        //   },
+        //   {
+        //     // You can set a attachment element(s) within the popup as well.
+        //     // Similar to text and media elements, attachments can only be set
+        //     // within the content. Any attachmentInfos associated with the feature
+        //     // will be listed in the popup.
+        //     type: "attachments"
+        //   }
+        // ]
+      },
+    });
+
+    this.map.add(featureLayer);
+
+    featureLayer.when(() => {
+      console.log('workforce baselayers feature layer loaded!');
+      // this.toggleLayerVisibility(featureLayer, true);
+      this.hideProgressBar();
+    });
+  }
+
+  private loadWorkforceDispatchers = (): void => {
+    this.showProgressBar();
+
+    // ToDo: Wire up DCP Workforce URLs once we get the Enterprise authentication working.
+
+    const url = 'http://services8.arcgis.com/gEL8e6Hiz8G7IYsL/arcgis/rest/services/dispatchers_d05d9283cc0e45b6a08add9484c6c19c/FeatureServer/0';
+    console.log('workforce workers feature layer url', url);
+
+    const featureLayer = new this.FeatureLayer({
+      url: url,
+      outFields: ['*'],
+      visible: true,
+      popupTemplate: { // autocasts as new PopupTemplate()
+        // title: "<font color='#008000'>DCP Plants</font>",
+        title: 'Dispatchers',
+
+        // Set content elements in the order to display.
+        // The first element displayed here is the fieldInfos.
+        // content: [
+        //   {
+        //     // It is also possible to set the fieldInfos outside of the content
+        //     // directly in the popupTemplate. If no fieldInfos is specifically set
+        //     // in the content, it defaults to whatever may be set within the popupTemplate.
+        //     type: 'fields',
+        //     fieldInfos: [
+        //       {
+        //         fieldName: 'PLANT_ID',
+        //         visible: true,
+        //         label: 'Plant ID',
+        //         format: {
+        //           places: 0,
+        //           digitSeparator: true
+        //         }
+        //       },
+        //       {
+        //         fieldName: 'NAME',
+        //         visible: true,
+        //         label: 'Plant Name',
+        //         format: {
+        //           places: 0,
+        //           digitSeparator: true
+        //         }
+        //       },
+        //       {
+        //         fieldName: 'TYPE',
+        //         visible: true,
+        //         label: 'Plant Type',
+        //         format: {
+        //           places: 0,
+        //           digitSeparator: true
+        //         }
+        //       },
+        //       {
+        //         fieldName: 'STATUS',
+        //         visible: true,
+        //         label: 'Plant Status'
+        //       },
+        //       {
+        //         fieldName: 'LONGITUDE',
+        //         visible: true,
+        //         label: 'Longitude'
+        //       },
+        //       {
+        //         fieldName: 'LATITUDE',
+        //         visible: true,
+        //         label: 'Latitude'
+        //       }
+        //     ]
+        //   },
+        //   {
+        //     // You can also set a descriptive text element. This element
+        //     // uses an attribute from the featurelayer which displays a
+        //     // sentence giving the total amount of trees value within a
+        //     // specified census block. Text elements can only be set within the content.
+        //     type: "text",
+        //     text: "There are {Point_Count} trees within census block {BLOCKCE10}"
+        //   },
+        //   {
+        //     // You can set a media element within the popup as well. This
+        //     // can be either an image or a chart. You specify this within
+        //     // the mediaInfos. The following creates a pie chart in addition
+        //     // to two separate images. The chart is also set up to work with
+        //     // related tables. Similar to text elements, media can only be set within the content.
+        //     type: "media",
+        //     mediaInfos: [
+        //       {
+        //         title: "<b>Count by type</b>",
+        //         type: "pie-chart",
+        //         caption: "",
+        //         value: {
+        //           theme: "Grasshopper",
+        //           fields: ["relationships/0/Point_Count_COMMON"],
+        //           normalizeField: null,
+        //           tooltipField: "relationships/0/COMMON"
+        //         }
+        //       },
+        //       {
+        //         title: "<b>Welcome to Beverly Hills</b>",
+        //         type: "image",
+        //         value: {
+        //           sourceURL: "https://www.beverlyhills.org/cbhfiles/storage/files/13203374121770673849/122707_039r_final.jpg"
+        //         }
+        //       },
+        //       {
+        //         title: "<b>Palm tree lined street</b>",
+        //         type: "image",
+        //         value: {
+        //           sourceURL: "https://cdn.loc.gov/service/pnp/highsm/21600/21679r.jpg"
+        //         }
+        //       }
+        //     ]
+        //   },
+        //   {
+        //     // You can set a attachment element(s) within the popup as well.
+        //     // Similar to text and media elements, attachments can only be set
+        //     // within the content. Any attachmentInfos associated with the feature
+        //     // will be listed in the popup.
+        //     type: "attachments"
+        //   }
+        // ]
+      },
+    });
+
+    this.map.add(featureLayer);
+
+    featureLayer.when(() => {
+      console.log('workforce dispatchers basemap feature layer loaded!');
+      this.hideProgressBar();
+    });
+  }
+
+  private loadWorkforceWorkers = (): void => {
+    this.showProgressBar();
+
+    // ToDo: Wire up DCP Workforce URLs once we get the Enterprise authentication working.
+
+    const url = 'http://services8.arcgis.com/gEL8e6Hiz8G7IYsL/arcgis/rest/services/workers_d05d9283cc0e45b6a08add9484c6c19c/FeatureServer/0';
+    console.log('workforce workers feature layer url', url);
+
+    const featureLayer = new this.FeatureLayer({
+      url: url,
+      outFields: ['*'],
+      visible: true,
+      popupTemplate: { // autocasts as new PopupTemplate()
+        // title: "<font color='#008000'>DCP Meters</font>",
+        title: 'Worker',
+
+        // Set content elements in the order to display.
+        // The first element displayed here is the fieldInfos.
+        content: [
+          {
+            // It is also possible to set the fieldInfos outside of the content
+            // directly in the popupTemplate. If no fieldInfos is specifically set
+            // in the content, it defaults to whatever may be set within the popupTemplate.
+            type: 'fields',
+            fieldInfos: [
+              {
+                fieldName: 'NAME',
+                visible: true,
+                label: 'Name',
+                format: {
+                  places: 0,
+                  digitSeparator: true
+                }
+              },
+              {
+                fieldName: 'STATUS',
+                visible: true,
+                label: 'Status',
+                format: {
+                  places: 0,
+                  digitSeparator: true
+                }
+              },
+              {
+                fieldName: 'TITLE',
+                visible: true,
+                label: 'Title',
+                format: {
+                  places: 0,
+                  digitSeparator: true
+                }
+              },
+              {
+                fieldName: 'CONTACTNUMBER',
+                visible: true,
+                label: 'Contact Number',
+                format: {
+                  places: 0,
+                  digitSeparator: true
+                }
+              },
+              {
+                fieldName: 'USERID',
+                visible: true,
+                label: 'User Id',
+                format: {
+                  places: 0,
+                  digitSeparator: true
+                }
+              },
+              {
+                fieldName: 'NOTES',
+                visible: true,
+                label: 'Notes',
+                format: {
+                  places: 0,
+                  digitSeparator: true
+                }
+              },
+              {
+                fieldName: 'CREATIONDATE',
+                visible: true,
+                label: 'Creation Date',
+                format: {
+                  places: 0,
+                  digitSeparator: true
+                }
+              },
+              {
+                fieldName: 'CREATOR',
+                visible: true,
+                label: 'Creator',
+                format: {
+                  places: 0,
+                  digitSeparator: true
+                }
+              },
+              {
+                fieldName: 'EDITDATE',
+                visible: true,
+                label: 'Edit Date',
+                format: {
+                  places: 0,
+                  digitSeparator: true
+                }
+              },
+              {
+                fieldName: 'EDITOR',
+                visible: true,
+                label: 'Editor',
+                format: {
+                  places: 0,
+                  digitSeparator: true
+                }
+              },
+            ]
+          },
+          //   {
+          //     // You can also set a descriptive text element. This element
+          //     // uses an attribute from the featurelayer which displays a
+          //     // sentence giving the total amount of trees value within a
+          //     // specified census block. Text elements can only be set within the content.
+          //     type: "text",
+          //     text: "There are {Point_Count} trees within census block {BLOCKCE10}"
+          //   },
+          //   {
+          //     // You can set a media element within the popup as well. This
+          //     // can be either an image or a chart. You specify this within
+          //     // the mediaInfos. The following creates a pie chart in addition
+          //     // to two separate images. The chart is also set up to work with
+          //     // related tables. Similar to text elements, media can only be set within the content.
+          //     type: "media",
+          //     mediaInfos: [
+          //       {
+          //         title: "<b>Count by type</b>",
+          //         type: "pie-chart",
+          //         caption: "",
+          //         value: {
+          //           theme: "Grasshopper",
+          //           fields: ["relationships/0/Point_Count_COMMON"],
+          //           normalizeField: null,
+          //           tooltipField: "relationships/0/COMMON"
+          //         }
+          //       },
+          //       {
+          //         title: "<b>Welcome to Beverly Hills</b>",
+          //         type: "image",
+          //         value: {
+          //           sourceURL: "https://www.beverlyhills.org/cbhfiles/storage/files/13203374121770673849/122707_039r_final.jpg"
+          //         }
+          //       },
+          //       {
+          //         title: "<b>Palm tree lined street</b>",
+          //         type: "image",
+          //         value: {
+          //           sourceURL: "https://cdn.loc.gov/service/pnp/highsm/21600/21679r.jpg"
+          //         }
+          //       }
+          //     ]
+          //   },
+          //   {
+          //     // You can set a attachment element(s) within the popup as well.
+          //     // Similar to text and media elements, attachments can only be set
+          //     // within the content. Any attachmentInfos associated with the feature
+          //     // will be listed in the popup.
+          //     type: "attachments"
+          //   }
+        ]
+      },
+    });
+
+    this.map.add(featureLayer);
+
+    featureLayer.when(() => {
+      console.log('workforce workers basemap feature layer loaded!');
+      this.hideProgressBar();
+    });
+  }
+
+  private loadWorkforceAssignments = (): void => {
+    this.showProgressBar();
+
+    // ToDo: Wire up DCP Workforce URLs once we get the Enterprise authentication working.
+
+    const url = 'http://services8.arcgis.com/gEL8e6Hiz8G7IYsL/arcgis/rest/services/assignments_d05d9283cc0e45b6a08add9484c6c19c/FeatureServer/0';
+    console.log('workforce assignments feature layer url', url);
+
+    const featureLayer = new this.FeatureLayer({
+      url: url,
+      outFields: ['*'],
+      visible: true,
+      popupTemplate: { // autocasts as new PopupTemplate()
+        // title: "<font color='#008000'>DCP Meters</font>",
+        title: 'Assignment',
+
+        // Set content elements in the order to display.
+        // The first element displayed here is the fieldInfos.
+        content: [
+          {
+            // It is also possible to set the fieldInfos outside of the content
+            // directly in the popupTemplate. If no fieldInfos is specifically set
+            // in the content, it defaults to whatever may be set within the popupTemplate.
+            type: 'fields',
+            fieldInfos: [
+              {
+                fieldName: 'DESCRIPTION',
+                visible: true,
+                label: 'Description',
+                format: {
+                  places: 0,
+                  digitSeparator: true
+                }
+              },
+              {
+                fieldName: 'STATUS',
+                visible: true,
+                label: 'Status',
+                format: {
+                  places: 0,
+                  digitSeparator: true
+                }
+              },
+              {
+                fieldName: 'NOTES',
+                visible: true,
+                label: 'Notes',
+                format: {
+                  places: 0,
+                  digitSeparator: true
+                }
+              },
+              {
+                fieldName: 'PRIORITY',
+                visible: true,
+                label: 'Priority',
+                format: {
+                  places: 0,
+                  digitSeparator: true
+                }
+              },
+              {
+                fieldName: 'ASSIGNMENTTYPE',
+                visible: true,
+                label: 'Assignment Type',
+                format: {
+                  places: 0,
+                  digitSeparator: true
+                }
+              },
+              {
+                fieldName: 'WORKORDERID',
+                visible: true,
+                label: 'Work Order Id',
+                format: {
+                  places: 0,
+                  digitSeparator: true
+                }
+              },
+              {
+                fieldName: 'DUEDATE',
+                visible: true,
+                label: 'Due Date',
+                format: {
+                  places: 0,
+                  digitSeparator: true
+                }
+              },
+              {
+                fieldName: 'WORKERID',
+                visible: true,
+                label: 'Worker Id',
+                format: {
+                  places: 0,
+                  digitSeparator: true
+                }
+              },
+              {
+                fieldName: 'LOCATION',
+                visible: true,
+                label: 'Location',
+                format: {
+                  places: 0,
+                  digitSeparator: true
+                }
+              },
+              {
+                fieldName: 'DECLINEDCOMMENT',
+                visible: true,
+                label: 'Declined Comment'
+              },
+              {
+                fieldName: 'ASSIGNEDDATE',
+                visible: true,
+                label: 'Assigned Date',
+                format: {
+                  places: 0,
+                  digitSeparator: true
+                }
+              },
+              {
+                fieldName: 'ASSIGNMENTREAD',
+                visible: true,
+                label: 'Assignment Read',
+                format: {
+                  places: 0,
+                  digitSeparator: true
+                }
+              },
+              {
+                fieldName: 'INPROGRESSDATE',
+                visible: true,
+                label: 'InProgress Date',
+                format: {
+                  places: 0,
+                  digitSeparator: true
+                }
+              },
+              {
+                fieldName: 'COMPLETEDDATE',
+                visible: true,
+                label: 'Completed Date',
+                format: {
+                  places: 0,
+                  digitSeparator: true
+                }
+              },
+              {
+                fieldName: 'DECLINEDDATE',
+                visible: true,
+                label: 'Declined Date',
+                format: {
+                  places: 0,
+                  digitSeparator: true
+                }
+              },
+              {
+                fieldName: 'PAUSEDDATE',
+                visible: true,
+                label: 'Paused Date',
+                format: {
+                  places: 0,
+                  digitSeparator: true
+                }
+              },
+              {
+                fieldName: 'DISPATCHERID',
+                visible: true,
+                label: 'Dispatcher Id',
+                format: {
+                  places: 0,
+                  digitSeparator: true
+                }
+              },
+              {
+                fieldName: 'CREATIONDATE',
+                visible: true,
+                label: 'Creation Date',
+                format: {
+                  places: 0,
+                  digitSeparator: true
+                }
+              },
+              {
+                fieldName: 'CREATOR',
+                visible: true,
+                label: 'Creator',
+                format: {
+                  places: 0,
+                  digitSeparator: true
+                }
+              },
+              {
+                fieldName: 'EDITDATE',
+                visible: true,
+                label: 'Edit Date',
+                format: {
+                  places: 0,
+                  digitSeparator: true
+                }
+              },
+              {
+                fieldName: 'EDITOR',
+                visible: true,
+                label: 'Editor',
+                format: {
+                  places: 0,
+                  digitSeparator: true
+                }
+              },
+            ]
+          },
+          //   {
+          //     // You can also set a descriptive text element. This element
+          //     // uses an attribute from the featurelayer which displays a
+          //     // sentence giving the total amount of trees value within a
+          //     // specified census block. Text elements can only be set within the content.
+          //     type: "text",
+          //     text: "There are {Point_Count} trees within census block {BLOCKCE10}"
+          //   },
+          //   {
+          //     // You can set a media element within the popup as well. This
+          //     // can be either an image or a chart. You specify this within
+          //     // the mediaInfos. The following creates a pie chart in addition
+          //     // to two separate images. The chart is also set up to work with
+          //     // related tables. Similar to text elements, media can only be set within the content.
+          //     type: "media",
+          //     mediaInfos: [
+          //       {
+          //         title: "<b>Count by type</b>",
+          //         type: "pie-chart",
+          //         caption: "",
+          //         value: {
+          //           theme: "Grasshopper",
+          //           fields: ["relationships/0/Point_Count_COMMON"],
+          //           normalizeField: null,
+          //           tooltipField: "relationships/0/COMMON"
+          //         }
+          //       },
+          //       {
+          //         title: "<b>Welcome to Beverly Hills</b>",
+          //         type: "image",
+          //         value: {
+          //           sourceURL: "https://www.beverlyhills.org/cbhfiles/storage/files/13203374121770673849/122707_039r_final.jpg"
+          //         }
+          //       },
+          //       {
+          //         title: "<b>Palm tree lined street</b>",
+          //         type: "image",
+          //         value: {
+          //           sourceURL: "https://cdn.loc.gov/service/pnp/highsm/21600/21679r.jpg"
+          //         }
+          //       }
+          //     ]
+          //   },
+          //   {
+          //     // You can set a attachment element(s) within the popup as well.
+          //     // Similar to text and media elements, attachments can only be set
+          //     // within the content. Any attachmentInfos associated with the feature
+          //     // will be listed in the popup.
+          //     type: "attachments"
+          //   }
+        ]
+      },
+    });
+
+    this.map.add(featureLayer);
+
+    featureLayer.when(() => {
+      console.log('workforce workers basemap feature layer loaded!');
       this.hideProgressBar();
     });
   }
