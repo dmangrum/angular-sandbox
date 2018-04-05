@@ -50,6 +50,8 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
   private LayerList: any;
   private IdentityManager: any;
   private ServerInfo: any;
+  private Credential: any;
+  private EsriConfig: any;
 
   private mapView: any;
   // private sceneView: any;
@@ -59,15 +61,50 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
   private readonly dataChunkSize = 1000;
   private readonly hideESRIAttribution = false;
 
-  // ToDo: Move to config settings along with service url - see s-one
-  private readonly extCustomerDashArcGISToken = 'O7iiomqrpZXsOGoQdjnOSdXx-lBEKkk9cUvdlgsesAVAy-pPJbgc1LDKkdVOH3Nv4rvJRIrNO-51kKMTEH5kTqfkFu6E9ETruZlplNv7fI38e2X_d_9hzS9SmPIvVA6x';
+  private readonly cachedCredentialKey: string = 'cachedCredential';
 
+  // ToDo: Cleanup code so urls are built based off of these global variables, not inline in functions.
+
+  private readonly azureGatekeeperServerUrl = 'https://api.dcpdigital.com/arcgis-test/';
+  private readonly azureGatekeeperSubscriptionKey = '80bf224db0844a1aaeb564e2147e55dd';
+
+  // private readonly dcpGISTokenServiceUrl = 'https://gistest.dcpmidstream.com/arcgis/tokens/generateToken';
+  private readonly dcpGISTokenServiceUrl = 'https://gistest.dcpmidstream.com/arcgis/tokens/';
+  // private readonly dcpGISServerUrl = 'https://gistest.dcpmidstream.com/';
+  private readonly dcpGISServerUrl = 'https://gistest.dcpmidstream.com/arcgis/rest/services/';
+  // private readonly dcpGISRestServicesRoute = 'arcgis/rest/services/';
+  private readonly dcpGISCustomerDashboardFeatureServiceRoute = 'Ext_CustomerDashboard/Ext_Dashboard_Layers/MapServer/';
+  private readonly dcpGISServerUsername = 'Ext_CustDash_Test';
+  private readonly dcpGISServerPassword = '7cSF9pyqD4C@S&&TP2KbvZQ$Mhfptn4v';
+  private dcpGISServerToken;
+
+  private readonly plantLayerIndex = 0;
+  private readonly boosterLayerIndex = 1;
+  private readonly meterLayerIndex = 2;
+  private readonly pipelineLayerIndex = 3;
+
+  // private readonly demoWorkforceServerUrl = 'http://services8.arcgis.com';
+  private readonly demoWorkforceServerUrl = 'http://www.arcgis.com';
+  private readonly demoWorkforceTokenServiceUrl = 'https://www.arcgis.com/sharing/generateToken';
+  private readonly demoWorkforceFeatureServiceUrl = 'http://services8.arcgis.com/gEL8e6Hiz8G7IYsL/arcgis/rest/services/';
+  // workers_d05d9283cc0e45b6a08add9484c6c19c/FeatureServer/';
+
+  // ToDo: Wire up global feature layer objects so we can edit/update/filter the references on change of the component (ex: show all assignments, show only my assignments)
   private demoType: string;
   private sub: any;
+
+  public userId;
 
   constructor(private route: ActivatedRoute) { }
 
   ngOnInit() {
+    // setting global dojo config object to enable webgl rendering of arcgis feature layers
+    window['dojoConfig'] = {
+      has: {
+        'esri-featurelayer-webgl': 1
+      }
+    };
+
     const options = {
       url: 'https://js.arcgis.com/' + this.jsAPIVersion + '/'
     };
@@ -78,12 +115,12 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
       'esri/widgets/Home', 'esri/widgets/Legend', 'esri/widgets/LayerList', 'esri/widgets/Zoom',
       'esri/widgets/Locate', 'esri/Viewpoint', 'esri/geometry/Circle',
       'esri/symbols/SimpleFillSymbol', 'esri/tasks/support/Query', 'esri/geometry/support/webMercatorUtils',
-      'esri/identity/IdentityManager', 'esri/identity/ServerInfo'], options).then(
+      'esri/identity/IdentityManager', 'esri/identity/ServerInfo', 'esri/identity/Credential', 'esri/config'], options).then(
         (
           [
             Map, MapView, Graphic, Point, Extent, FeatureLayer, ScaleBar, Compass, Field, PopupTemplate,
             PictureMarkerSymbol, Home, Legend, LayerList, Zoom, Locate, Viewpoint, Circle, SimpleFillSymbol, Query,
-            WebMercatorUtils, IdentityManager, ServerInfo
+            WebMercatorUtils, IdentityManager, ServerInfo, Credential, EsriConfig
           ]
         ) => {
           this.Map = Map; this.MapView = MapView; this.Graphic = Graphic; this.Point = Point; this.Extent = Extent;
@@ -92,7 +129,12 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
           this.Home = Home; this.Legend = Legend; this.LayerList = LayerList; this.Zoom = Zoom; this.Locate = Locate;
           this.Viewpoint = Viewpoint; this.Circle = Circle;
           this.SimpleFillSymbol = SimpleFillSymbol; this.Query = Query; this.WebMercatorUtils = WebMercatorUtils;
-          this.IdentityManager = IdentityManager; this.ServerInfo = ServerInfo;
+          this.IdentityManager = IdentityManager; this.ServerInfo = ServerInfo; this.Credential = Credential;
+          this.EsriConfig = EsriConfig;
+
+          // Explicitly add DCP GIS Server URL to CORS Enabled Servers list so XHR calls can be made
+          // between localhost (development client) and the remote DCP GIS Server.
+          this.EsriConfig.request.corsEnabledServers.push(this.dcpGISServerUrl);
 
           this.initializeMap();
         });
@@ -109,6 +151,12 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
     this.sub = this.route.params.subscribe(params => {
       this.demoType = params['demoType']; // (+) converts string 'id' to a number
     });
+  }
+
+  public signOut() {
+    this.clearCredential();
+
+    location.reload();
   }
 
   private initializeMap() {
@@ -231,6 +279,11 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
         this.loadDemo();
       }
     });
+
+    this.mapView.on('click', event => {
+      console.log('map view click event', event);
+      alert('ouch!  that hurt!');
+    });
   }
 
   private loadDemo() {
@@ -243,72 +296,211 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
         this.loadDCPFeatureLayers(true, true, true, true);
         break;
       case 'workforce-demo':
-        // this.authenticateUser();
-        this.loadDCPFeatureLayers(true, true, true, true);
-        this.loadWorkforceFeatureLayers();
+        this.generateToken(
+          this.dcpGISServerUsername,
+          this.dcpGISServerPassword,
+          this.dcpGISServerUrl,
+          this.dcpGISTokenServiceUrl
+        ).then((result) => {
+          // alert('there');
+          this.loadDCPFeatureLayers(true, true, true, true);
+        });
+
+        this.authenticateUser(
+          this.demoWorkforceFeatureServiceUrl,
+          this.demoWorkforceServerUrl,
+          this.demoWorkforceTokenServiceUrl
+        ).then((result) => {
+          // alert('there');
+          this.loadWorkforceFeatureLayers();
+        });
         break;
       case 'gatekeeper-demo':
-        alert('here');
         // this.authenticateUser();
-        // this.loadDCPFeatureLayers(true, true, true, true);
+        // this.loadDCPFeatureLayers(true, true, true, true, true);
         break;
-      // ToDo: wire up leak log demo that displays leaks on the map and allows
-      // a user to click on them, open a dialog box, enter details & attachments (logging details)
-      // and submit the edit back to the service/backend api 
-      // need to troll the portal for the leak api or request the url & creds from mark/catherine
+      case 'leaklog-demo':
+        // ToDo: wire up leak log demo that displays leaks on the map and allows
+        // a user to click on them, open a dialog box, enter details & attachments (logging details)
+        // and submit the edit back to the service/backend api 
+        // need to troll the portal for the leak api or request the url & creds from mark/catherine
+        break;
     }
   }
 
-  private authenticateUser = (): void => {
-    // ToDo: Figure out how to authenticate against enterprise on prem server
-    // const identityManager = new this.IdentityManager();
-
-    // const url = 'https://utility.arcgis.com/usrsvcs/servers/0e696ad6daf74ad194fc9530fc6af6f3/rest/services/Ext_DCP_Demo/Demo_DCP_Base/MapServer/';
-
-    // const serverInfo = this.IdentityManager.findServerInfo(url);
-
-
-    const serverInfos = [];
+  private generateToken = (username, password, server, tokenServiceUrl): Promise<any> => {
+    console.log('username', username);
+    console.log('password', password);
+    console.log('server', server);
+    console.log('token service url', tokenServiceUrl);
 
     const serverInfo = new this.ServerInfo();
-    serverInfo.server = 'https://gistest.dcpmidstream.com/';
-    serverInfo.tokenServiceUrl = 'https://gistest.dcpmidstream.com/arcgis/tokens/generateToken';
-
-    serverInfos.push(serverInfo);
-
-    // const serverInfo = new this.ServerInfo();
-    // serverInfo.server = "http://services8.arcgis.com";
-    // serverInfo.tokenServiceUrl = "https://www.arcgis.com/sharing/generateToken";
-
-
-
-    this.IdentityManager.registerServers(serverInfos);
-
-
-    // ToDo: Figure out how to generate token for all requests in session along with how to cache credentails for future use.
-
-    console.log('identity manager', this.IdentityManager);
-
-    const userId = 'dbmangrum_dev';
-    const password = '******'; // todo: wire up credential prompt and caching
+    serverInfo.server = server;
+    serverInfo.tokenServiceUrl = tokenServiceUrl;
 
     const userInfo = {
-      username: userId,
+      username: username,
       password: password
     };
 
-    console.log('dalton was here');
+    return new Promise((resolve, reject) => {
+      this.IdentityManager.generateToken(serverInfo, userInfo).then((response) => {
+        console.log('generate token response', response);
 
-    this.IdentityManager.generateToken(serverInfo, userInfo).when((response) => {
-      console.log('generate token response', response);
-      // this.IdentifyManager.registerToken({
-      //   server: serverInfo.server,
-      //   userId: userId,
-      //   token: response.token,
-      //   expires: response.expires,
-      //   ssl: response.ssl
-      // });
+        // const newCredential = new this.Credential({
+        //   server: response.server,
+        //   userId: response.userId,
+        //   token: response.token,
+        //   expires: response.expires,
+        //   isAdmin: response.isAdmin,
+        //   ssl: response.ssl
+        // });
+
+        // this.IdentityManager.registerToken(newCredential);
+
+        this.IdentityManager.registerToken({ token: response.token, server: server, expires: response.expires });
+        // ToDo: Move to calling code so the response handling is more generic
+        this.dcpGISServerToken = response.token;
+
+        resolve();
+      }).catch((error) => {
+        console.log('generate token error', error);
+      });
     });
+  }
+
+  private authenticateUser = (url, server, tokenServiceUrl): Promise<any> => {
+    // ToDo: Figure out how to authenticate against enterprise on prem agol server
+
+    console.log('url', url);
+    console.log('server', server);
+    console.log('token service url', tokenServiceUrl);
+
+    const serverInfo = new this.ServerInfo();
+    serverInfo.server = server;
+    serverInfo.tokenServiceUrl = tokenServiceUrl;
+
+    // ToDo: Clean up this method by consolidating duplicate code into centralized sub routines.
+    return new Promise((resolve, reject) => {
+      // this.clearCredential(); // uncomment to explicitly clear invalid credential/token from cache
+      // resolve();
+
+      const existingCredential = this.getCredential();
+
+      if (existingCredential) {
+        console.log('existing credential found...', existingCredential);
+
+        // ToDo: Figure out how to automatically refresh the cached credentials token if its expired
+        // so we're not reprompted and the application doesn't error out.
+        // Calling credential.refreshToken() is throwing an 'undefined is not an object'
+        // error in the arcgis js api. - got here
+        // existingCredential.refreshToken();
+
+        this.IdentityManager.registerToken(existingCredential);
+        this.userId = existingCredential.userId;
+
+        this.IdentityManager.checkSignInStatus(url).then((response) => {
+          console.log('check sign in status response', response);
+          console.log('existing credentials valid, bypassing sign in protocol...');
+          // this.IdentityManager.registerToken(existingCredential);
+          // this.userId = existingCredential.userId;
+          resolve();
+        }).catch((error) => {
+          console.log('check sign in status error', error);
+          if (error.details.httpStatus === 498) { // invalid token
+            console.log('existing credentials expired, signing in...');
+            alert('test me');
+            this.IdentityManager.signIn(url, serverInfo).then((response) => {
+              // alert('here');
+              console.log('sign in response', response);
+
+              const newCredential = new this.Credential({
+                server: response.server,
+                userId: response.userId,
+                token: response.token,
+                expires: response.expires,
+                isAdmin: response.isAdmin,
+                ssl: response.ssl
+              });
+
+              // ToDo: Move to calling code so the response handling is more generic
+              this.IdentityManager.registerToken(newCredential);
+              this.saveCredential(newCredential);
+              this.userId = newCredential.userId;
+              resolve();
+            }).catch((error) => {
+              console.log('sign in error', error);
+            });
+          }
+        });
+
+        // this.IdentityManager.registerToken(existingCredential);
+        // this.userId = existingCredential.userId;
+        // resolve();
+      } else {
+        console.log('existing credentials not found, signing in...');
+        this.IdentityManager.signIn(url, serverInfo).then((response) => {
+          // alert('here');
+          console.log('sign in response', response);
+
+          const newCredential = new this.Credential({
+            server: response.server,
+            userId: response.userId,
+            token: response.token,
+            expires: response.expires,
+            isAdmin: response.isAdmin,
+            ssl: response.ssl
+          });
+
+          // ToDo: Move to calling code so the response handling is more generic
+          this.IdentityManager.registerToken(newCredential);
+          this.saveCredential(newCredential);
+          this.userId = newCredential.userId;
+          resolve();
+        }).catch((error) => {
+          console.log('sign in error', error);
+        });
+      }
+    });
+  }
+
+  private saveCredential = (credential): void => {
+    console.log('saving credential...', credential);
+
+    localStorage.setItem(this.cachedCredentialKey, JSON.stringify(credential));
+  }
+
+  private clearCredential = (): void => {
+    console.log('clearing cached credential');
+
+    console.log('local storage before removal', localStorage);
+    localStorage.removeItem(this.cachedCredentialKey);
+    console.log('local storage after removal', localStorage);
+  }
+
+  private getCredential = (): any => {
+    console.log('getting credential...');
+
+    const cachedCredential = this.getFromLocalStorage(this.cachedCredentialKey);
+
+    let credential;
+    if (cachedCredential) {
+      // ToDo: Figure out how to cast to this.Credential so we don't have to construct an object on the fly.
+      credential = new this.Credential({
+        server: cachedCredential.server,
+        userId: cachedCredential.userId,
+        token: cachedCredential.token,
+        expires: cachedCredential.expires,
+        isAdmin: cachedCredential.isAdmin,
+        ssl: cachedCredential.ssl
+      });
+    }
+
+    return credential;
+  }
+
+  private getFromLocalStorage = (key): any => {
+    return JSON.parse(localStorage.getItem(key)) || false;
   }
 
   private loadUSFeatureLayers = (): void => {
@@ -318,22 +510,28 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
     this.loadUSCities();
   }
 
-  private loadDCPFeatureLayers = (loadMeters?, loadPlants?, loadBoosters?, loadPipelines?): void => {
-    if (loadMeters) {
-      this.loadDCPMeters();
-    }
-    if (loadPlants) {
-      this.loadDCPPlants();
-    }
+  private loadDCPFeatureLayers = (loadMeters?, loadPlants?, loadBoosters?, loadPipelines?, useGateKeeper?): void => {
+    // if (loadMeters) {
+    //   this.loadDCPMeters(useGateKeeper);
+    // }
+    // if (loadPlants) {
+    //   this.loadDCPPlants(useGateKeeper);
+    // }
     if (loadBoosters) {
-      this.loadDCPBoosters();
+      this.loadDCPBoosters(useGateKeeper);
     }
-    if (loadPipelines) {
-      this.loadDCPPipelines();
-    }
+    // if (loadPipelines) {
+    //   this.loadDCPPipelines(useGateKeeper);
+    // }
   }
 
   private loadWorkforceFeatureLayers = (): void => {
+    // ToDo: Create asignments for dilton mingrim in workforce and verify his
+    // assignments are not displayed when logged in as dalton;
+    // will we need to explicilty filter the assignments layer
+    // based on workerid (looked up based on email/username) or will it just happen
+    // natively? - got here
+
     // this.loadWorkforceBaselayers();
     // this.loadWorkforceDispatchers();
     this.loadWorkforceWorkers();
@@ -412,10 +610,14 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
     });
   }
 
-  private loadDCPPlants = (): void => {
+  private loadDCPPlants = (useGateKeeper?): void => {
     this.showProgressBar();
 
-    const url = 'https://gistest.dcpmidstream.com/arcgis/rest/services/Ext_CustomerDashboard/Ext_Dashboard_Layers/MapServer/0';
+    // ToDo: Wire up this.dcpGISServerUrl & this.dcpAPIGatekeeperUrl here
+    let url = 'https://gistest.dcpmidstream.com/arcgis/rest/services/Ext_CustomerDashboard/Ext_Dashboard_Layers/MapServer/0';
+    if (useGateKeeper) {
+      url = 'https://api.dcpdigital.com/arcgis-test/Ext_CustomerDashboard/Ext_Dashboard_Layers/MapServer/0/?subscription-key=80bf224db0844a1aaeb564e2147e55dd';
+    }
 
     console.log('plants feature layer url', url);
 
@@ -543,12 +745,18 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
     });
   }
 
-  private loadDCPBoosters = (): void => {
+  private loadDCPBoosters = (useGateKeeper?): void => {
     this.showProgressBar();
 
-    // const url = 'https://gistest.dcpmidstream.com/arcgis/rest/services/Ext_CustomerDashboard/Ext_Dashboard_Layers/MapServer/1';
-    const url = 'https://gistest.dcpmidstream.com/arcgis/rest/services/Ext_CustomerDashboard/Ext_Dashboard_Layers/MapServer/1'; // ?token=' + this.extCustomerDashArcGISToken;
-    // const url = 'https://api.dcpdigital.com/arcgis-test/Ext_CustomerDashboard/Ext_Dashboard_Layers/MapServer/1/?subscription-key=80bf224db0844a1aaeb564e2147e55dd';
+    let url = useGateKeeper ? this.azureGatekeeperServerUrl : this.dcpGISServerUrl;
+    url += this.dcpGISCustomerDashboardFeatureServiceRoute + this.boosterLayerIndex;
+
+    if (useGateKeeper) {
+      url += '?subscription-key=' + this.azureGatekeeperSubscriptionKey;
+    }
+    // } else {
+    //   url += '?token=' + this.dcpGISServerToken;
+    // }
 
     console.log('booster feature layer url', url);
 
@@ -556,7 +764,7 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
       url: url,
       outFields: ['*'],
       visible: true,
-      // token: this.extCustomerDashArcGISToken, // todo: figure out why this token isnt working
+      // token: this.dcpGISServerToken,
       popupTemplate: { // autocasts as new PopupTemplate()
         // title: "<font color='#008000'>DCP Boosters</font>",
         title: 'DCP Booster',
@@ -677,10 +885,14 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
     });
   }
 
-  private loadDCPMeters = (): void => {
+  private loadDCPMeters = (useGateKeeper?): void => {
     this.showProgressBar();
 
-    const url = 'https://gistest.dcpmidstream.com/arcgis/rest/services/Ext_CustomerDashboard/Ext_Dashboard_Layers/MapServer/2';
+    // ToDo: Wire up this.dcpGISServerUrl & this.dcpAPIGatekeeperUrl here
+    let url = 'https://gistest.dcpmidstream.com/arcgis/rest/services/Ext_CustomerDashboard/Ext_Dashboard_Layers/MapServer/2';
+    if (useGateKeeper) {
+      url = 'https://api.dcpdigital.com/arcgis-test/Ext_CustomerDashboard/Ext_Dashboard_Layers/MapServer/2/?subscription-key=80bf224db0844a1aaeb564e2147e55dd';
+    }
 
     console.log('meters feature layer url', url);
 
@@ -688,7 +900,6 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
       url: url,
       outFields: ['*'],
       visible: true,
-      token: this.extCustomerDashArcGISToken,
       popupTemplate: { // autocasts as new PopupTemplate()
         // title: "<font color='#008000'>DCP Meters</font>",
         title: 'DCP Meter',
@@ -759,298 +970,302 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
     });
   }
 
-  private loadDCPMetersOLD = (meterNumbers, renderPipelines): void => {
+  // private loadDCPMetersOLD = (meterNumbers, renderPipelines): void => {
+  //   this.showProgressBar();
+
+  //   let meterCount = 0;
+
+  //   if (meterNumbers !== null && typeof (meterNumbers) !== 'undefined') {
+  //     meterCount = meterNumbers.length;
+  //   }
+
+  //   console.time('meters load time');
+  //   // console.profile("Meters Load Profile");
+
+  //   if (meterCount === 0) {
+  //     const dcpMetersFeatureLayer = new this.FeatureLayer({
+  //       url: 'https://gistest.dcpmidstream.com/arcgis/rest/services/Ext_CustomerDashboard/Ext_Dashboard_Layers/MapServer/2',
+  //       outFields: ['*'],
+  //       visible: true,
+  //       popupTemplate: { // autocasts as new PopupTemplate()
+  //         // title: "<font color='#008000'>DCP Meters</font>",
+  //         title: 'DCP Meter',
+
+  //         // Set content elements in the order to display.
+  //         // The first element displayed here is the fieldInfos.
+  //         content: [
+  //           {
+  //             // It is also possible to set the fieldInfos outside of the content
+  //             // directly in the popupTemplate. If no fieldInfos is specifically set
+  //             // in the content, it defaults to whatever may be set within the popupTemplate.
+  //             type: 'fields',
+  //             fieldInfos: [
+  //               {
+  //                 fieldName: 'METER_NUMBER',
+  //                 visible: true,
+  //                 label: 'Meter Number',
+  //                 format: {
+  //                   places: 0,
+  //                   digitSeparator: true
+  //                 }
+  //               },
+  //               {
+  //                 fieldName: 'METER_NAME',
+  //                 visible: true,
+  //                 label: 'Meter Name',
+  //                 format: {
+  //                   places: 0,
+  //                   digitSeparator: true
+  //                 }
+  //               },
+  //               {
+  //                 fieldName: 'STATUS',
+  //                 visible: true,
+  //                 label: 'Status',
+  //                 format: {
+  //                   places: 0,
+  //                   digitSeparator: true
+  //                 }
+  //               },
+  //               {
+  //                 fieldName: 'METER_STATUS',
+  //                 visible: true,
+  //                 label: 'Meter Status'
+  //               },
+  //               {
+  //                 fieldName: 'COMPANY_NAME',
+  //                 visible: true,
+  //                 label: 'Company Name'
+  //               },
+  //               {
+  //                 fieldName: 'SYSTEM',
+  //                 visible: true,
+  //                 label: 'System'
+  //               }
+  //             ]
+  //           },
+  //         ]
+  //       },
+  //     });
+
+  //     this.map.add(dcpMetersFeatureLayer);
+  //   } else {
+  //     let i, j = 0;
+
+  //     const dcpMeterFeatureLayers = [];
+
+  //     // *Note: For performance reasons we split the meters into feature layers with 1000 features.
+  //     for (i = 0, j = meterNumbers.length; i < j; i += this.dataChunkSize) {
+  //       const slicedMeterNumbers = meterNumbers.slice(i, i + this.dataChunkSize);
+
+  //       let counter = 0;
+  //       const slicedMeterCount = slicedMeterNumbers.length;
+  //       const lookupField = 'METER_NUMBER';
+  //       let whereClause = '';
+
+  //       whereClause += lookupField + ' IN (';
+  //       slicedMeterNumbers.forEach(meterNumber => {
+  //         counter++;
+  //         whereClause += '\'' + meterNumber + '\'';
+  //         if (counter < slicedMeterCount) {
+  //           whereClause += ',';
+  //         }
+  //       });
+  //       whereClause += ')';
+
+  //       // console.log('Where Clause', whereClause);
+  //       // console.log("Meter Count", meterCount);
+
+  //       console.log('rendering ' + slicedMeterCount + '/' + meterCount + ' meters...');
+
+  //       const dcpMetersFeatureLayer = new this.FeatureLayer({
+  //         url: 'https://gistest.dcpmidstream.com/arcgis/rest/services/Ext_CustomerDashboard/Ext_Dashboard_Layers/MapServer/2',
+  //         outFields: ['*'],
+  //         visible: true,
+  //         definitionExpression: whereClause,
+  //         popupTemplate: { // autocasts as new PopupTemplate()
+  //           // title: "<font color='#008000'>DCP Meters</font>",
+  //           title: 'DCP Meter',
+
+  //           // Set content elements in the order to display.
+  //           // The first element displayed here is the fieldInfos.
+  //           content: [
+  //             {
+  //               // It is also possible to set the fieldInfos outside of the content
+  //               // directly in the popupTemplate. If no fieldInfos is specifically set
+  //               // in the content, it defaults to whatever may be set within the popupTemplate.
+  //               type: 'fields',
+  //               fieldInfos: [
+  //                 {
+  //                   fieldName: 'METER_NUMBER',
+  //                   visible: true,
+  //                   label: 'Meter Number',
+  //                   format: {
+  //                     places: 0,
+  //                     digitSeparator: true
+  //                   }
+  //                 },
+  //                 {
+  //                   fieldName: 'METER_NAME',
+  //                   visible: true,
+  //                   label: 'Meter Name',
+  //                   format: {
+  //                     places: 0,
+  //                     digitSeparator: true
+  //                   }
+  //                 },
+  //                 {
+  //                   fieldName: 'STATUS',
+  //                   visible: true,
+  //                   label: 'Status',
+  //                   format: {
+  //                     places: 0,
+  //                     digitSeparator: true
+  //                   }
+  //                 },
+  //                 {
+  //                   fieldName: 'METER_STATUS',
+  //                   visible: true,
+  //                   label: 'Meter Status'
+  //                 },
+  //                 {
+  //                   fieldName: 'COMPANY_NAME',
+  //                   visible: true,
+  //                   label: 'Company Name'
+  //                 },
+  //                 {
+  //                   fieldName: 'SYSTEM',
+  //                   visible: true,
+  //                   label: 'System'
+  //                 }
+  //               ]
+  //             },
+  //           ]
+  //         },
+  //       });
+
+  //       this.map.add(dcpMetersFeatureLayer);
+  //       dcpMeterFeatureLayers.push(dcpMetersFeatureLayer);
+
+  //       dcpMetersFeatureLayer.then((results) => {
+  //         // console.log('dcp meters feature layer loaded!');
+  //         // dcpMetersFeatureLayer.visible = true;
+  //         dcpMetersFeatureLayer.highlight();
+  //       });
+  //     }
+
+  //     // let meterFeatureLayerExtentQueries = [];
+
+  //     Promise.all(dcpMeterFeatureLayers).then((results) => {
+  //       // alert('all done!');
+  //       // console.log('all dcp meters feature layers loaded!')
+  //       // console.log('Results', results);
+
+  //       // let fullExtent = null;
+  //       const meterFeatureLayerExtentQueries = [];
+
+  //       results.forEach(featureLayer => {
+  //         // console.log('Feature Layer', featureLayer);
+
+  //         const meterFeatureLayerExtentQuery = featureLayer.queryExtent();
+  //         meterFeatureLayerExtentQueries.push(meterFeatureLayerExtentQuery);
+
+  //         meterFeatureLayerExtentQuery.then((results) => {
+  //           // console.log('meter feature layer extent query executed!')
+  //           // console.log('Results', results);
+  //           // let featuresExtent = results.extent;
+  //           // console.log('Features Extent', featuresExtent);
+  //           // if (fullExtent === null)
+  //           //   fullExtent = featuresExtent;
+  //           // else
+  //           //   fullExtent = fullExtent.union(featuresExtent);
+  //         });
+  //       });
+
+  //       Promise.all(meterFeatureLayerExtentQueries).then((results) => {
+  //         // console.log('all meter feature layer extent queries executed!');
+  //         // console.log('Results', results);
+
+  //         let fullExtent = null;
+  //         let totalFeatureCount = 0;
+
+  //         results.forEach(featureLayerQueryResult => {
+  //           // console.log('Feature Layer Query Result', featureLayerQueryResult);
+
+  //           const featureCount = featureLayerQueryResult.count;
+
+  //           // console.log('drawing ' + slicedMeterCount + '/' + meterCount + ' meters...');
+
+  //           totalFeatureCount += featureCount;
+
+  //           const featuresExtent = featureLayerQueryResult.extent;
+  //           // console.log('Features Extent', featuresExtent);
+  //           if (fullExtent === null) {
+  //             fullExtent = featuresExtent;
+  //           } else {
+  //             fullExtent = fullExtent.union(featuresExtent);
+  //           }
+  //         });
+
+  //         // console.log('Full Extent', fullExtent);
+
+  //         const convertedExtent = this.WebMercatorUtils.geographicToWebMercator(fullExtent);
+
+  //         // console.log('Converted Extent', convertedExtent);
+
+  //         // console.log('total features rendered =>', totalFeatureCount);
+
+  //         console.log(totalFeatureCount + '/' + meterCount + ' meters rendered!');
+
+  //         console.timeEnd('meters load time');
+  //         // console.profileEnd();
+
+  //         this.zoomToExtent(convertedExtent);
+
+  //         // this.loadDCPPlants();
+  //         // this.loadDCPBoosters();
+  //         if (renderPipelines) {
+  //           this.loadDCPPipelines();
+  //         }
+
+  //         // console.log('Map View', this.mapView);
+  //       });
+
+
+  //       // dcpMetersFeatureLayer.then((results) => {
+  //       //   return dcpMetersFeatureLayer.queryExtent();
+  //       // }).then((results) => {
+  //       //   //console.log('Meter Layer Loaded', this.dcpMetersFeatureLayer.loaded);
+
+  //       //   let featuresExtent = results.extent;
+
+  //       //   console.log('Features Extent', featuresExtent);
+
+  //       //   let convertedExtent = webMercatorUtils.geographicToWebMercator(featuresExtent);
+
+  //       //   console.log('Converted Extent', convertedExtent);
+
+  //       //   this.zoomToExtent(convertedExtent);
+
+  //       // console.timeEnd("Meters Load Time");
+  //       // console.profileEnd();
+  //     });
+  //   }
+
+  //   // Promise.all(meterFeatureLayerExtentQueries).then((results) => {
+  //   //   console.log('all meter feature layer extent queries executed!');
+  //   //   console.log('Results', results);
+  //   // });
+  // }
+
+  private loadDCPPipelines = (useGateKeeper?): void => {
     this.showProgressBar();
 
-    let meterCount = 0;
-
-    if (meterNumbers !== null && typeof (meterNumbers) !== 'undefined') {
-      meterCount = meterNumbers.length;
+    // ToDo: Wire up this.dcpGISServerUrl & this.dcpAPIGatekeeperUrl here
+    let url = 'https://gistest.dcpmidstream.com/arcgis/rest/services/Ext_CustomerDashboard/Ext_Dashboard_Layers/MapServer/3';
+    if (useGateKeeper) {
+      url = 'https://api.dcpdigital.com/arcgis-test/Ext_CustomerDashboard/Ext_Dashboard_Layers/MapServer/3/?subscription-key=80bf224db0844a1aaeb564e2147e55dd';
     }
-
-    console.time('meters load time');
-    // console.profile("Meters Load Profile");
-
-    if (meterCount === 0) {
-      const dcpMetersFeatureLayer = new this.FeatureLayer({
-        url: 'https://gistest.dcpmidstream.com/arcgis/rest/services/Ext_CustomerDashboard/Ext_Dashboard_Layers/MapServer/2',
-        outFields: ['*'],
-        visible: true,
-        popupTemplate: { // autocasts as new PopupTemplate()
-          // title: "<font color='#008000'>DCP Meters</font>",
-          title: 'DCP Meter',
-
-          // Set content elements in the order to display.
-          // The first element displayed here is the fieldInfos.
-          content: [
-            {
-              // It is also possible to set the fieldInfos outside of the content
-              // directly in the popupTemplate. If no fieldInfos is specifically set
-              // in the content, it defaults to whatever may be set within the popupTemplate.
-              type: 'fields',
-              fieldInfos: [
-                {
-                  fieldName: 'METER_NUMBER',
-                  visible: true,
-                  label: 'Meter Number',
-                  format: {
-                    places: 0,
-                    digitSeparator: true
-                  }
-                },
-                {
-                  fieldName: 'METER_NAME',
-                  visible: true,
-                  label: 'Meter Name',
-                  format: {
-                    places: 0,
-                    digitSeparator: true
-                  }
-                },
-                {
-                  fieldName: 'STATUS',
-                  visible: true,
-                  label: 'Status',
-                  format: {
-                    places: 0,
-                    digitSeparator: true
-                  }
-                },
-                {
-                  fieldName: 'METER_STATUS',
-                  visible: true,
-                  label: 'Meter Status'
-                },
-                {
-                  fieldName: 'COMPANY_NAME',
-                  visible: true,
-                  label: 'Company Name'
-                },
-                {
-                  fieldName: 'SYSTEM',
-                  visible: true,
-                  label: 'System'
-                }
-              ]
-            },
-          ]
-        },
-      });
-
-      this.map.add(dcpMetersFeatureLayer);
-    } else {
-      let i, j = 0;
-
-      const dcpMeterFeatureLayers = [];
-
-      // *Note: For performance reasons we split the meters into feature layers with 1000 features.
-      for (i = 0, j = meterNumbers.length; i < j; i += this.dataChunkSize) {
-        const slicedMeterNumbers = meterNumbers.slice(i, i + this.dataChunkSize);
-
-        let counter = 0;
-        const slicedMeterCount = slicedMeterNumbers.length;
-        const lookupField = 'METER_NUMBER';
-        let whereClause = '';
-
-        whereClause += lookupField + ' IN (';
-        slicedMeterNumbers.forEach(meterNumber => {
-          counter++;
-          whereClause += '\'' + meterNumber + '\'';
-          if (counter < slicedMeterCount) {
-            whereClause += ',';
-          }
-        });
-        whereClause += ')';
-
-        // console.log('Where Clause', whereClause);
-        // console.log("Meter Count", meterCount);
-
-        console.log('rendering ' + slicedMeterCount + '/' + meterCount + ' meters...');
-
-        const dcpMetersFeatureLayer = new this.FeatureLayer({
-          url: 'https://gistest.dcpmidstream.com/arcgis/rest/services/Ext_CustomerDashboard/Ext_Dashboard_Layers/MapServer/2',
-          outFields: ['*'],
-          visible: true,
-          definitionExpression: whereClause,
-          popupTemplate: { // autocasts as new PopupTemplate()
-            // title: "<font color='#008000'>DCP Meters</font>",
-            title: 'DCP Meter',
-
-            // Set content elements in the order to display.
-            // The first element displayed here is the fieldInfos.
-            content: [
-              {
-                // It is also possible to set the fieldInfos outside of the content
-                // directly in the popupTemplate. If no fieldInfos is specifically set
-                // in the content, it defaults to whatever may be set within the popupTemplate.
-                type: 'fields',
-                fieldInfos: [
-                  {
-                    fieldName: 'METER_NUMBER',
-                    visible: true,
-                    label: 'Meter Number',
-                    format: {
-                      places: 0,
-                      digitSeparator: true
-                    }
-                  },
-                  {
-                    fieldName: 'METER_NAME',
-                    visible: true,
-                    label: 'Meter Name',
-                    format: {
-                      places: 0,
-                      digitSeparator: true
-                    }
-                  },
-                  {
-                    fieldName: 'STATUS',
-                    visible: true,
-                    label: 'Status',
-                    format: {
-                      places: 0,
-                      digitSeparator: true
-                    }
-                  },
-                  {
-                    fieldName: 'METER_STATUS',
-                    visible: true,
-                    label: 'Meter Status'
-                  },
-                  {
-                    fieldName: 'COMPANY_NAME',
-                    visible: true,
-                    label: 'Company Name'
-                  },
-                  {
-                    fieldName: 'SYSTEM',
-                    visible: true,
-                    label: 'System'
-                  }
-                ]
-              },
-            ]
-          },
-        });
-
-        this.map.add(dcpMetersFeatureLayer);
-        dcpMeterFeatureLayers.push(dcpMetersFeatureLayer);
-
-        dcpMetersFeatureLayer.then((results) => {
-          // console.log('dcp meters feature layer loaded!');
-          // dcpMetersFeatureLayer.visible = true;
-          dcpMetersFeatureLayer.highlight();
-        });
-      }
-
-      // let meterFeatureLayerExtentQueries = [];
-
-      Promise.all(dcpMeterFeatureLayers).then((results) => {
-        // alert('all done!');
-        // console.log('all dcp meters feature layers loaded!')
-        // console.log('Results', results);
-
-        // let fullExtent = null;
-        const meterFeatureLayerExtentQueries = [];
-
-        results.forEach(featureLayer => {
-          // console.log('Feature Layer', featureLayer);
-
-          const meterFeatureLayerExtentQuery = featureLayer.queryExtent();
-          meterFeatureLayerExtentQueries.push(meterFeatureLayerExtentQuery);
-
-          meterFeatureLayerExtentQuery.then((results) => {
-            // console.log('meter feature layer extent query executed!')
-            // console.log('Results', results);
-            // let featuresExtent = results.extent;
-            // console.log('Features Extent', featuresExtent);
-            // if (fullExtent === null)
-            //   fullExtent = featuresExtent;
-            // else
-            //   fullExtent = fullExtent.union(featuresExtent);
-          });
-        });
-
-        Promise.all(meterFeatureLayerExtentQueries).then((results) => {
-          // console.log('all meter feature layer extent queries executed!');
-          // console.log('Results', results);
-
-          let fullExtent = null;
-          let totalFeatureCount = 0;
-
-          results.forEach(featureLayerQueryResult => {
-            // console.log('Feature Layer Query Result', featureLayerQueryResult);
-
-            const featureCount = featureLayerQueryResult.count;
-
-            // console.log('drawing ' + slicedMeterCount + '/' + meterCount + ' meters...');
-
-            totalFeatureCount += featureCount;
-
-            const featuresExtent = featureLayerQueryResult.extent;
-            // console.log('Features Extent', featuresExtent);
-            if (fullExtent === null) {
-              fullExtent = featuresExtent;
-            } else {
-              fullExtent = fullExtent.union(featuresExtent);
-            }
-          });
-
-          // console.log('Full Extent', fullExtent);
-
-          const convertedExtent = this.WebMercatorUtils.geographicToWebMercator(fullExtent);
-
-          // console.log('Converted Extent', convertedExtent);
-
-          // console.log('total features rendered =>', totalFeatureCount);
-
-          console.log(totalFeatureCount + '/' + meterCount + ' meters rendered!');
-
-          console.timeEnd('meters load time');
-          // console.profileEnd();
-
-          this.zoomToExtent(convertedExtent);
-
-          // this.loadDCPPlants();
-          // this.loadDCPBoosters();
-          if (renderPipelines) {
-            this.loadDCPPipelines();
-          }
-
-          // console.log('Map View', this.mapView);
-        });
-
-
-        // dcpMetersFeatureLayer.then((results) => {
-        //   return dcpMetersFeatureLayer.queryExtent();
-        // }).then((results) => {
-        //   //console.log('Meter Layer Loaded', this.dcpMetersFeatureLayer.loaded);
-
-        //   let featuresExtent = results.extent;
-
-        //   console.log('Features Extent', featuresExtent);
-
-        //   let convertedExtent = webMercatorUtils.geographicToWebMercator(featuresExtent);
-
-        //   console.log('Converted Extent', convertedExtent);
-
-        //   this.zoomToExtent(convertedExtent);
-
-        // console.timeEnd("Meters Load Time");
-        // console.profileEnd();
-      });
-    }
-
-    // Promise.all(meterFeatureLayerExtentQueries).then((results) => {
-    //   console.log('all meter feature layer extent queries executed!');
-    //   console.log('Results', results);
-    // });
-  }
-
-  private loadDCPPipelines = (): void => {
-    this.showProgressBar();
-
-    const url = 'https://gistest.dcpmidstream.com/arcgis/rest/services/Ext_CustomerDashboard/Ext_Dashboard_Layers/MapServer/3';
 
     console.log('pipelnes feature layer url', url);
 
@@ -1329,6 +1544,8 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
     this.showProgressBar();
 
     // ToDo: Wire up DCP Workforce URLs once we get the Enterprise authentication working.
+
+    // ToDo: Wire up this.demoWorkforceFeatureServiceUrl here to dynamically build the url
 
     const url = 'http://services8.arcgis.com/gEL8e6Hiz8G7IYsL/arcgis/rest/services/dispatchers_d05d9283cc0e45b6a08add9484c6c19c/FeatureServer/0';
     console.log('workforce workers feature layer url', url);

@@ -8,5 +8,12 @@
 </script> -->
 
 <div #mapViewContainer>
-  <div #progressBar id="progressBar"></div>
+  <div *ngIf='userId' id="userId">
+    <small>
+      Signed in as:
+      <b>{{userId}}</b>
+      <button type='button' (click)='signOut();'>Sign Out</button>
+    </small>
+  </div>
+  <div #progressBar id='progressBar'></div>
 </div>
