@@ -76,18 +76,28 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
   private readonly dcpGISCustomerDashboardFeatureServiceRoute = 'Ext_CustomerDashboard/Ext_Dashboard_Layers/MapServer/';
   private readonly dcpGISServerUsername = 'Ext_CustDash_Test';
   private readonly dcpGISServerPassword = '7cSF9pyqD4C@S&&TP2KbvZQ$Mhfptn4v';
-  private dcpGISServerToken;
+  // private dcpGISServerToken;
 
   private readonly plantLayerIndex = 0;
   private readonly boosterLayerIndex = 1;
   private readonly meterLayerIndex = 2;
   private readonly pipelineLayerIndex = 3;
 
+  // ToDo: Wire up DCP Workforce URLs once we get the Enterprise authentication working.
+
   // private readonly demoWorkforceServerUrl = 'http://services8.arcgis.com';
   private readonly demoWorkforceServerUrl = 'http://www.arcgis.com';
   private readonly demoWorkforceTokenServiceUrl = 'https://www.arcgis.com/sharing/generateToken';
   private readonly demoWorkforceFeatureServiceUrl = 'http://services8.arcgis.com/gEL8e6Hiz8G7IYsL/arcgis/rest/services/';
-  // workers_d05d9283cc0e45b6a08add9484c6c19c/FeatureServer/';
+  private readonly demoWorkforceWorkersRoute = 'workers_d05d9283cc0e45b6a08add9484c6c19c/FeatureServer/';
+  private readonly demoWorkforceDispatchersRoute = 'dipatchers_d05d9283cc0e45b6a08add9484c6c19c/FeatureServer/';
+  private readonly demoWorkforceAssignmentsRoute = 'assignments_d05d9283cc0e45b6a08add9484c6c19c/FeatureServer/';
+
+  private readonly workersLayerIndex = 0;
+  private readonly dispatchersLayerIndex = 0;
+  private readonly assignmentsLayerIndex = 0;
+
+  // ToDo: Wire up last extent caching and loading.
 
   // ToDo: Wire up global feature layer objects so we can edit/update/filter the references on change of the component (ex: show all assignments, show only my assignments)
   private demoType: string;
@@ -283,6 +293,8 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
     this.mapView.on('click', event => {
       console.log('map view click event', event);
       alert('ouch!  that hurt!');
+      // ToDo: Wire up feature layer editing here - see sandbox example - got here
+      // https://developers.arcgis.com/javascript/latest/sample-code/sandbox/index.html?sample=editing-applyedits
     });
   }
 
@@ -312,11 +324,10 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
           this.demoWorkforceTokenServiceUrl
         ).then((result) => {
           // alert('there');
-          this.loadWorkforceFeatureLayers();
+          this.loadWorkforceFeatureLayers(true, true);
         });
         break;
       case 'gatekeeper-demo':
-        // this.authenticateUser();
         // this.loadDCPFeatureLayers(true, true, true, true, true);
         break;
       case 'leaklog-demo':
@@ -347,20 +358,10 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
       this.IdentityManager.generateToken(serverInfo, userInfo).then((response) => {
         console.log('generate token response', response);
 
-        // const newCredential = new this.Credential({
-        //   server: response.server,
-        //   userId: response.userId,
-        //   token: response.token,
-        //   expires: response.expires,
-        //   isAdmin: response.isAdmin,
-        //   ssl: response.ssl
-        // });
-
-        // this.IdentityManager.registerToken(newCredential);
-
         this.IdentityManager.registerToken({ token: response.token, server: server, expires: response.expires });
+
         // ToDo: Move to calling code so the response handling is more generic
-        this.dcpGISServerToken = response.token;
+        // this.dcpGISServerToken = response.token;
 
         resolve();
       }).catch((error) => {
@@ -393,7 +394,7 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
         // ToDo: Figure out how to automatically refresh the cached credentials token if its expired
         // so we're not reprompted and the application doesn't error out.
         // Calling credential.refreshToken() is throwing an 'undefined is not an object'
-        // error in the arcgis js api. - got here
+        // error in the arcgis js api.
         // existingCredential.refreshToken();
 
         this.IdentityManager.registerToken(existingCredential);
@@ -409,7 +410,7 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
           console.log('check sign in status error', error);
           if (error.details.httpStatus === 498) { // invalid token
             console.log('existing credentials expired, signing in...');
-            alert('test me');
+            alert('verify me');
             this.IdentityManager.signIn(url, serverInfo).then((response) => {
               // alert('here');
               console.log('sign in response', response);
@@ -511,21 +512,21 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
   }
 
   private loadDCPFeatureLayers = (loadMeters?, loadPlants?, loadBoosters?, loadPipelines?, useGateKeeper?): void => {
-    // if (loadMeters) {
-    //   this.loadDCPMeters(useGateKeeper);
-    // }
-    // if (loadPlants) {
-    //   this.loadDCPPlants(useGateKeeper);
-    // }
+    if (loadMeters) {
+      this.loadDCPMeters(useGateKeeper);
+    }
+    if (loadPlants) {
+      this.loadDCPPlants(useGateKeeper);
+    }
     if (loadBoosters) {
       this.loadDCPBoosters(useGateKeeper);
     }
-    // if (loadPipelines) {
-    //   this.loadDCPPipelines(useGateKeeper);
-    // }
+    if (loadPipelines) {
+      this.loadDCPPipelines(useGateKeeper);
+    }
   }
 
-  private loadWorkforceFeatureLayers = (): void => {
+  private loadWorkforceFeatureLayers = (loadWorkers?, loadAssignments?): void => {
     // ToDo: Create asignments for dilton mingrim in workforce and verify his
     // assignments are not displayed when logged in as dalton;
     // will we need to explicilty filter the assignments layer
@@ -534,8 +535,12 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
 
     // this.loadWorkforceBaselayers();
     // this.loadWorkforceDispatchers();
-    this.loadWorkforceWorkers();
-    this.loadWorkforceAssignments();
+    if (loadWorkers) {
+      this.loadWorkforceWorkers();
+    }
+    if (loadAssignments) {
+      this.loadWorkforceAssignments();
+    }
   }
 
   private loadUSCities = (): void => {
@@ -613,11 +618,15 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
   private loadDCPPlants = (useGateKeeper?): void => {
     this.showProgressBar();
 
-    // ToDo: Wire up this.dcpGISServerUrl & this.dcpAPIGatekeeperUrl here
-    let url = 'https://gistest.dcpmidstream.com/arcgis/rest/services/Ext_CustomerDashboard/Ext_Dashboard_Layers/MapServer/0';
+    let url = useGateKeeper ? this.azureGatekeeperServerUrl : this.dcpGISServerUrl;
+    url += this.dcpGISCustomerDashboardFeatureServiceRoute + this.plantLayerIndex;
+
     if (useGateKeeper) {
-      url = 'https://api.dcpdigital.com/arcgis-test/Ext_CustomerDashboard/Ext_Dashboard_Layers/MapServer/0/?subscription-key=80bf224db0844a1aaeb564e2147e55dd';
+      url += '?subscription-key=' + this.azureGatekeeperSubscriptionKey;
     }
+    // } else {
+    //   url += '?token=' + this.dcpGISServerToken;
+    // }
 
     console.log('plants feature layer url', url);
 
@@ -625,6 +634,7 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
       url: url,
       outFields: ['*'],
       visible: true,
+      // token: this.dcpGISServerToken,
       popupTemplate: { // autocasts as new PopupTemplate()
         // title: "<font color='#008000'>DCP Plants</font>",
         title: 'DCP Plant',
@@ -736,7 +746,7 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
       },
     });
 
-    this.map.add(featureLayer);
+    this.map.add(featureLayer, this.plantLayerIndex);
 
     featureLayer.when(() => {
       console.log('dcp plants feature layer loaded!');
@@ -876,7 +886,7 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
       },
     });
 
-    this.map.add(featureLayer);
+    this.map.add(featureLayer, this.boosterLayerIndex);
 
     featureLayer.when(() => {
       console.log('dcp boosters feature layer loaded!');
@@ -888,11 +898,15 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
   private loadDCPMeters = (useGateKeeper?): void => {
     this.showProgressBar();
 
-    // ToDo: Wire up this.dcpGISServerUrl & this.dcpAPIGatekeeperUrl here
-    let url = 'https://gistest.dcpmidstream.com/arcgis/rest/services/Ext_CustomerDashboard/Ext_Dashboard_Layers/MapServer/2';
+    let url = useGateKeeper ? this.azureGatekeeperServerUrl : this.dcpGISServerUrl;
+    url += this.dcpGISCustomerDashboardFeatureServiceRoute + this.meterLayerIndex;
+
     if (useGateKeeper) {
-      url = 'https://api.dcpdigital.com/arcgis-test/Ext_CustomerDashboard/Ext_Dashboard_Layers/MapServer/2/?subscription-key=80bf224db0844a1aaeb564e2147e55dd';
+      url += '?subscription-key=' + this.azureGatekeeperSubscriptionKey;
     }
+    // } else {
+    //   url += '?token=' + this.dcpGISServerToken;
+    // }
 
     console.log('meters feature layer url', url);
 
@@ -900,6 +914,7 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
       url: url,
       outFields: ['*'],
       visible: true,
+      // token: this.dcpGISServerToken,
       popupTemplate: { // autocasts as new PopupTemplate()
         // title: "<font color='#008000'>DCP Meters</font>",
         title: 'DCP Meter',
@@ -961,7 +976,7 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
       },
     });
 
-    this.map.add(featureLayer);
+    this.map.add(featureLayer, this.meterLayerIndex);
 
     featureLayer.when(() => {
       console.log('dcp meters feature layer loaded!');
@@ -1261,11 +1276,15 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
   private loadDCPPipelines = (useGateKeeper?): void => {
     this.showProgressBar();
 
-    // ToDo: Wire up this.dcpGISServerUrl & this.dcpAPIGatekeeperUrl here
-    let url = 'https://gistest.dcpmidstream.com/arcgis/rest/services/Ext_CustomerDashboard/Ext_Dashboard_Layers/MapServer/3';
+    let url = useGateKeeper ? this.azureGatekeeperServerUrl : this.dcpGISServerUrl;
+    url += this.dcpGISCustomerDashboardFeatureServiceRoute + this.pipelineLayerIndex;
+
     if (useGateKeeper) {
-      url = 'https://api.dcpdigital.com/arcgis-test/Ext_CustomerDashboard/Ext_Dashboard_Layers/MapServer/3/?subscription-key=80bf224db0844a1aaeb564e2147e55dd';
+      url += '?subscription-key=' + this.azureGatekeeperSubscriptionKey;
     }
+    // } else {
+    //   url += '?token=' + this.dcpGISServerToken;
+    // }
 
     console.log('pipelnes feature layer url', url);
 
@@ -1274,6 +1293,7 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
       url: url,
       outFields: ['*'],
       visible: true,
+      // token: this.dcpGISServerToken,
       popupTemplate: { // autocasts as new PopupTemplate()
         // title: "<font color='#008000'>DCP Meters</font>",
         title: 'DCP Pipeline',
@@ -1398,7 +1418,7 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
       },
     });
 
-    this.map.add(featureLayer, -1000);
+    this.map.add(featureLayer, this.pipelineLayerIndex);
 
     featureLayer.when(() => {
       console.log('dcp pipelines feature layer loaded!');
@@ -1540,14 +1560,16 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
     });
   }
 
-  private loadWorkforceDispatchers = (): void => {
+  private loadWorkforceDispatchers = (useGateKeeper?): void => {
     this.showProgressBar();
 
-    // ToDo: Wire up DCP Workforce URLs once we get the Enterprise authentication working.
+    let url = useGateKeeper ? this.azureGatekeeperServerUrl : this.demoWorkforceFeatureServiceUrl;
+    url += this.demoWorkforceDispatchersRoute + this.dispatchersLayerIndex;
 
-    // ToDo: Wire up this.demoWorkforceFeatureServiceUrl here to dynamically build the url
+    if (useGateKeeper) {
+      url += '?subscription-key=' + this.azureGatekeeperSubscriptionKey;
+    }
 
-    const url = 'http://services8.arcgis.com/gEL8e6Hiz8G7IYsL/arcgis/rest/services/dispatchers_d05d9283cc0e45b6a08add9484c6c19c/FeatureServer/0';
     console.log('workforce workers feature layer url', url);
 
     const featureLayer = new this.FeatureLayer({
@@ -1673,12 +1695,16 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
     });
   }
 
-  private loadWorkforceWorkers = (): void => {
+  private loadWorkforceWorkers = (useGateKeeper?): void => {
     this.showProgressBar();
 
-    // ToDo: Wire up DCP Workforce URLs once we get the Enterprise authentication working.
+    let url = useGateKeeper ? this.azureGatekeeperServerUrl : this.demoWorkforceFeatureServiceUrl;
+    url += this.demoWorkforceWorkersRoute + this.workersLayerIndex;
 
-    const url = 'http://services8.arcgis.com/gEL8e6Hiz8G7IYsL/arcgis/rest/services/workers_d05d9283cc0e45b6a08add9484c6c19c/FeatureServer/0';
+    if (useGateKeeper) {
+      url += '?subscription-key=' + this.azureGatekeeperSubscriptionKey;
+    }
+
     console.log('workforce workers feature layer url', url);
 
     const featureLayer = new this.FeatureLayer({
@@ -1852,12 +1878,15 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
     });
   }
 
-  private loadWorkforceAssignments = (): void => {
+  private loadWorkforceAssignments = (useGateKeeper?): void => {
     this.showProgressBar();
 
-    // ToDo: Wire up DCP Workforce URLs once we get the Enterprise authentication working.
+    let url = useGateKeeper ? this.azureGatekeeperServerUrl : this.demoWorkforceFeatureServiceUrl;
+    url += this.demoWorkforceAssignmentsRoute + this.assignmentsLayerIndex;
 
-    const url = 'http://services8.arcgis.com/gEL8e6Hiz8G7IYsL/arcgis/rest/services/assignments_d05d9283cc0e45b6a08add9484c6c19c/FeatureServer/0';
+    if (useGateKeeper) {
+      url += '?subscription-key=' + this.azureGatekeeperSubscriptionKey;
+    }
     console.log('workforce assignments feature layer url', url);
 
     const featureLayer = new this.FeatureLayer({
