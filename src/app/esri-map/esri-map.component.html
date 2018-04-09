@@ -16,4 +16,25 @@
     </small>
   </div>
   <div #progressBar id='progressBar'></div>
+
+  <div #editAssignmentContainer id="editAssignmentContainer" style="display:none; margin-top: 1em;">
+    <div style='float: right; font-size: 16px; font-weight: bold; cursor: pointer;' (click)=closeEditAssignmentWindow();>X</div>
+    <h3 class="list-heading">Edit Assignment</h3>
+
+    <div id="attributeArea">
+      <label for="assignmentNotes">Notes:</label>
+      <br>
+      <!-- <input #assignmentNotes id="assignmentNotes" class="inputInfo" type="text" placeHolder="Enter notes"> -->
+      <textarea #assignmentNotes id="assignmentNotes" rows="10" cols="30">Enter notes here</textarea>
+      <br>
+      <!-- <label for="inputUserInfo">Contact:</label>
+      <input class="inputInfo" required type="email" name="email" id="inputUserInfo" pattern="[^ @]*@[^ @]*"
+        placeHolder="Enter email address"><br> -->
+      <input #btnSave id="btnSave" type="button" class="edit-button" value="Save" (click)='saveAssignment();'>
+    </div>
+
+    <!-- <div id="deleteArea">
+      <input type="button" class="edit-button" value="Delete incident" id="btnDelete">
+    </div> -->
+  </div>
 </div>

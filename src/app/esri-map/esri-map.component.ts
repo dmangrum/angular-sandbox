@@ -13,6 +13,8 @@ import { ActivatedRoute } from '@angular/router';
 export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDestroy {
   @ViewChild('mapViewContainer') private mapViewContainer: ElementRef;
   @ViewChild('progressBar') private progressBar: ElementRef;
+  @ViewChild('editAssignmentContainer') editAssignmentContainer: ElementRef;
+  @ViewChild('assignmentNotes') assignmentNotes: ElementRef;
 
   private Map: any;
   private Basemap: any;
@@ -57,13 +59,14 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
   // private sceneView: any;
   private map: any;
 
+  // private savedMapExtent: any;
+
   private readonly jsAPIVersion = '4.6';
   private readonly dataChunkSize = 1000;
   private readonly hideESRIAttribution = false;
 
   private readonly cachedCredentialKey: string = 'cachedCredential';
-
-  // ToDo: Cleanup code so urls are built based off of these global variables, not inline in functions.
+  private readonly savedMapExtentKey: string = 'savedMapExtent';
 
   private readonly azureGatekeeperServerUrl = 'https://api.dcpdigital.com/arcgis-test/';
   private readonly azureGatekeeperSubscriptionKey = '80bf224db0844a1aaeb564e2147e55dd';
@@ -93,19 +96,24 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
   private readonly demoWorkforceDispatchersRoute = 'dipatchers_d05d9283cc0e45b6a08add9484c6c19c/FeatureServer/';
   private readonly demoWorkforceAssignmentsRoute = 'assignments_d05d9283cc0e45b6a08add9484c6c19c/FeatureServer/';
 
+  private readonly demoWorkforceAssignmentLayerTitle = 'Assignments d05d9283cc0e45b6a08add9484c6c19c';
+
   private readonly workersLayerIndex = 0;
   private readonly dispatchersLayerIndex = 0;
   private readonly assignmentsLayerIndex = 0;
 
-  // ToDo: Wire up last extent caching and loading.
+  private workforceAssignmentsFeatureLayer: any;
+  private selectedAssignment: any;
 
-  // ToDo: Wire up global feature layer objects so we can edit/update/filter the references on change of the component (ex: show all assignments, show only my assignments)
+  // ToDo: Wire up show all assignments, show only my assignments toggle control, along with complete assignment checkbox
   private demoType: string;
   private sub: any;
 
   public userId;
 
   constructor(private route: ActivatedRoute) { }
+
+  // ToDo: Wire up layer list/enabled layers caching.
 
   ngOnInit() {
     // setting global dojo config object to enable webgl rendering of arcgis feature layers
@@ -165,6 +173,7 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
 
   public signOut() {
     this.clearCredential();
+    this.clearMapExtent();
 
     location.reload();
   }
@@ -203,6 +212,18 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
       }
     });
 
+    // let zoom = 7; // 7; // 6; // 5; // 4; // 3;
+
+    let initialExtent = homeExtent;
+
+    const savedExtent = this.getMapExtent();
+    if (savedExtent) {
+      console.log('saved extent', savedExtent);
+
+      initialExtent = savedExtent;
+      // zoom = 0;
+    }
+
     // const baseMap = 'streets-night-vector';
     // const baseMap = 'streets-vector'
     const baseMap = 'streets-navigation-vector';
@@ -213,15 +234,13 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
       basemap: baseMap
     });
 
-    const zoom = 7; // 7; // 6; // 5; // 4; // 3;
-
     this.mapView = new this.MapView({
       container: this.mapViewContainer.nativeElement,
       // center: centerPoint,
-      extent: homeExtent,
+      extent: initialExtent,
       // scale: scale,
       // spatialReference: { wkid: 4326 },
-      zoom: zoom,
+      // zoom: zoom,
       map: this.map,
       popup: {
         dockEnabled: false,
@@ -240,7 +259,14 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
       view: this.mapView
     });
 
-    this.mapView.ui.add(homeButton, 'top-left');
+    const homeViewPoint = new this.Viewpoint({
+      targetGeometry: homeExtent,
+      scale: 2311162.217155
+    });
+
+    homeButton.viewpoint = homeViewPoint;
+
+    this.mapView.ui.add(homeButton, 'bottom-right');
 
     this.mapView.ui.remove('zoom');
 
@@ -248,7 +274,7 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
       view: this.mapView
     });
 
-    this.mapView.ui.add(zoomButton, 'top-left');
+    this.mapView.ui.add(zoomButton, 'bottom-right');
 
     const locateButton = new this.Locate({
       view: this.mapView
@@ -283,6 +309,17 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
     this.mapView.when(() => {
       console.log('map view loaded!');
 
+      console.log('map view scale', this.mapView.scale);
+
+      // const savedMapExtent = this.getMapExtent();
+      // if (savedMapExtent) {
+      //   console.log('saved map extent', savedMapExtent);
+
+      //   // this.mapView.extent = savedMapExtent;
+      //   // this.zoomToExtent(savedMapExtent);
+      //   setTimeout(() => { this.zoomToExtent(savedMapExtent); }, 2000);
+      // }
+
       this.hideProgressBar();
 
       if (this.demoType) {
@@ -292,9 +329,146 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
 
     this.mapView.on('click', event => {
       console.log('map view click event', event);
-      alert('ouch!  that hurt!');
-      // ToDo: Wire up feature layer editing here - see sandbox example - got here
-      // https://developers.arcgis.com/javascript/latest/sample-code/sandbox/index.html?sample=editing-applyedits
+      this.unhighlightAssignment();
+
+      this.mapView.hitTest(event.screenPoint).then(response => {
+        console.log('hittest response', response);
+
+        if (response.results.length > 0) {
+          // Process Assignment Features
+          const assignmentFeature = response.results.find(result =>
+            result.graphic.layer
+            && result.graphic.layer.title
+            && result.graphic.layer.title === this.demoWorkforceAssignmentLayerTitle
+            // && result.graphic.symbol
+            // && result.graphic.symbol.type
+            // && result.graphic.symbol.type !== 'text'
+          );
+
+          console.log('assignment feature', assignmentFeature);
+
+          if (assignmentFeature) {
+            const graphic = assignmentFeature.graphic;
+
+            // alert(graphic.layer.title);
+
+            const objectId = graphic.attributes[this.workforceAssignmentsFeatureLayer.objectIdField];
+
+            if (objectId) {
+              this.highlightAssignment(objectId);
+
+              const attributes = graphic.attributes;
+              const notes = attributes.notes;
+
+              this.assignmentNotes.nativeElement.value = notes;
+
+              this.editAssignmentContainer.nativeElement.style.display = 'inline'; // 'block';
+            }
+          }
+        }
+      });
+    });
+
+    this.mapView.watch('stationary', animating => {
+      console.log('animating map view...', animating);
+
+      if (this.mapView.stationary && this.mapView.extent && this.mapView.zoom > 0) {
+        const currentExtent = this.mapView.extent;
+        console.log('current extent', currentExtent);
+
+        // const wkid = this.mapView.spatialReference.wkid;
+
+        // const currentExtent = new this.Extent({
+        //   xmax: extent.xmax,
+        //   xmin: extent.xmin,
+        //   ymax: extent.ymax,
+        //   ymin: extent.ymin,
+        //   spatialReference: {
+        //     'wkid': wkid
+        //   }
+        // });
+
+        this.saveMapExtent(currentExtent);
+      }
+    });
+  }
+
+  private unhighlightAssignment() {
+    if (
+      this.editAssignmentContainer !== null
+      && typeof this.editAssignmentContainer !== 'undefined'
+      && this.editAssignmentContainer.nativeElement !== null
+      && typeof this.editAssignmentContainer.nativeElement !== 'undefined'
+    ) {
+      this.editAssignmentContainer.nativeElement.style.display = 'none';
+    }
+
+    this.assignmentNotes.nativeElement.value = null;
+    // inputAssignmentCompleted.nativeElement.value = null;
+
+    this.mapView.graphics.removeAll();
+  }
+
+  private highlightAssignment(objectId: any) {
+    console.log('selected feature object id', objectId);
+    const selectedSymbol = {
+      type: 'simple-marker', // autocasts as new SimpleMarkerSymbol()
+      color: [0, 0, 0, 0],
+      style: 'square',
+      size: '40px',
+      outline: {
+        // color: [0, 255, 255, 1],
+        color: [255, 255, 0, 1],
+        width: '3px'
+      }
+    };
+
+    const query = this.workforceAssignmentsFeatureLayer.createQuery();
+    query.where = this.workforceAssignmentsFeatureLayer.objectIdField + ' = ' + objectId;
+
+    this.workforceAssignmentsFeatureLayer.queryFeatures(query).then(results => {
+      console.log('query results', results);
+      if (results.features.length > 0) {
+        const feature = results.features[0];
+        // const attributes = feature.attributes;
+        // const notes = attributes.notes;
+
+        this.selectedAssignment = feature;
+
+        console.log('selected assignment', this.selectedAssignment);
+        this.selectedAssignment.symbol = selectedSymbol;
+
+        this.mapView.graphics.add(this.selectedAssignment);
+      }
+    });
+  }
+
+  public closeEditAssignmentWindow() {
+    this.editAssignmentContainer.nativeElement.style.display = 'none';
+  }
+
+  public saveAssignment() {
+    console.log('saving assignment...');
+
+    if (this.selectedAssignment) {
+      this.selectedAssignment.attributes['notes'] = this.assignmentNotes.nativeElement.value;
+
+      const edits = {
+        updateFeatures: [this.selectedAssignment]
+      };
+
+      this.updateAssignment(edits);
+    }
+  }
+
+  private updateAssignment(edits) {
+    // this.unhighlightAssignment();
+
+    this.workforceAssignmentsFeatureLayer.applyEdits(edits).then(results => {
+      console.log('update assignment results', results);
+      this.closeEditAssignmentWindow();
+    }).catch((error) => {
+      console.log('update assignment error', error);
     });
   }
 
@@ -410,7 +584,7 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
           console.log('check sign in status error', error);
           if (error.details.httpStatus === 498) { // invalid token
             console.log('existing credentials expired, signing in...');
-            alert('verify me');
+            // alert('verify me');
             this.IdentityManager.signIn(url, serverInfo).then((response) => {
               // alert('here');
               console.log('sign in response', response);
@@ -500,6 +674,41 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
     return credential;
   }
 
+  private saveMapExtent = (mapExtent): void => {
+    console.log('saving map extent...', mapExtent);
+
+    localStorage.setItem(this.savedMapExtentKey, JSON.stringify(mapExtent));
+  }
+
+  private clearMapExtent = (): void => {
+    console.log('clearing saved map extent');
+
+    console.log('local storage before removal', localStorage);
+    localStorage.removeItem(this.savedMapExtentKey);
+    console.log('local storage after removal', localStorage);
+  }
+
+  private getMapExtent = (): any => {
+    console.log('getting map extent...');
+
+    const savedMapExtent = this.getFromLocalStorage(this.savedMapExtentKey);
+
+    let mapExtent;
+    if (savedMapExtent) {
+      mapExtent = new this.Extent({
+        xmax: savedMapExtent.xmax,
+        xmin: savedMapExtent.xmin,
+        ymax: savedMapExtent.ymax,
+        ymin: savedMapExtent.ymin,
+        spatialReference: {
+          wkid: savedMapExtent.spatialReference.wkid
+        }
+      });
+    }
+
+    return mapExtent;
+  }
+
   private getFromLocalStorage = (key): any => {
     return JSON.parse(localStorage.getItem(key)) || false;
   }
@@ -528,7 +737,7 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
 
   private loadWorkforceFeatureLayers = (loadWorkers?, loadAssignments?): void => {
     // ToDo: Create asignments for dilton mingrim in workforce and verify his
-    // assignments are not displayed when logged in as dalton;
+    // assignments are not displayed when logged in as Dalton;
     // will we need to explicilty filter the assignments layer
     // based on workerid (looked up based on email/username) or will it just happen
     // natively? - got here
@@ -1889,10 +2098,11 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
     }
     console.log('workforce assignments feature layer url', url);
 
-    const featureLayer = new this.FeatureLayer({
+    this.workforceAssignmentsFeatureLayer = new this.FeatureLayer({
       url: url,
       outFields: ['*'],
       visible: true,
+      popupEnabled: true,
       popupTemplate: { // autocasts as new PopupTemplate()
         // title: "<font color='#008000'>DCP Meters</font>",
         title: 'Assignment',
@@ -2147,9 +2357,9 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
       },
     });
 
-    this.map.add(featureLayer);
+    this.map.add(this.workforceAssignmentsFeatureLayer);
 
-    featureLayer.when(() => {
+    this.workforceAssignmentsFeatureLayer.when(() => {
       console.log('workforce workers basemap feature layer loaded!');
       this.hideProgressBar();
     });
