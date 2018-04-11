@@ -14,7 +14,11 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
   @ViewChild('mapViewContainer') private mapViewContainer: ElementRef;
   @ViewChild('progressBar') private progressBar: ElementRef;
   @ViewChild('editAssignmentContainer') editAssignmentContainer: ElementRef;
+  @ViewChild('assignmentDescription') assignmentDescription: ElementRef;
+  @ViewChild('assignmentPriority') assignmentPriority: ElementRef;
+  @ViewChild('assignmentDueDate') assignmentDueDate: ElementRef;
   @ViewChild('assignmentNotes') assignmentNotes: ElementRef;
+  @ViewChild('assignmentStatus') assignmentStatus: ElementRef;
 
   private Map: any;
   private Basemap: any;
@@ -22,6 +26,7 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
   private ScaleBar: any;
   private Compass: any;
   private Locate: any;
+  private Expand: any;
   private Popup: any;
   private FeatureLayer: any;
   private PopupTemplate: any;
@@ -54,6 +59,7 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
   private ServerInfo: any;
   private Credential: any;
   private EsriConfig: any;
+
 
   private mapView: any;
   // private sceneView: any;
@@ -92,20 +98,25 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
   private readonly demoWorkforceServerUrl = 'http://www.arcgis.com';
   private readonly demoWorkforceTokenServiceUrl = 'https://www.arcgis.com/sharing/generateToken';
   private readonly demoWorkforceFeatureServiceUrl = 'http://services8.arcgis.com/gEL8e6Hiz8G7IYsL/arcgis/rest/services/';
-  private readonly demoWorkforceWorkersRoute = 'workers_d05d9283cc0e45b6a08add9484c6c19c/FeatureServer/';
-  private readonly demoWorkforceDispatchersRoute = 'dipatchers_d05d9283cc0e45b6a08add9484c6c19c/FeatureServer/';
-  private readonly demoWorkforceAssignmentsRoute = 'assignments_d05d9283cc0e45b6a08add9484c6c19c/FeatureServer/';
-
-  private readonly demoWorkforceAssignmentLayerTitle = 'Assignments d05d9283cc0e45b6a08add9484c6c19c';
+  private readonly demoWorkforceWorkersRoute = 'workers_544df6ec0c314b44be0d949c1ad0ee7d/FeatureServer/';
+  private readonly demoWorkforceDispatchersRoute = 'dispatchers_544df6ec0c314b44be0d949c1ad0ee7d/FeatureServer/';
+  private readonly demoWorkforceAssignmentsRoute = 'assignments_544df6ec0c314b44be0d949c1ad0ee7d/FeatureServer/';
+  private readonly demoWorkforceLocationsRoute = 'location_544df6ec0c314b44be0d949c1ad0ee7d/FeatureServer/';
+  private readonly demoWorkforceAssignmentLayerTitle = 'Assignments 544df6ec0c314b44be0d949c1ad0ee7d';
 
   private readonly workersLayerIndex = 0;
   private readonly dispatchersLayerIndex = 0;
   private readonly assignmentsLayerIndex = 0;
+  private readonly locationsLayerIndex = 0;
+
+  // add home office layer
 
   private workforceAssignmentsFeatureLayer: any;
   private selectedAssignment: any;
+  private editAssignmentExpand: any;
 
   // ToDo: Wire up show all assignments, show only my assignments toggle control, along with complete assignment checkbox
+
   private demoType: string;
   private sub: any;
 
@@ -131,13 +142,13 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
       'esri/geometry/Point', 'esri/geometry/Extent', 'esri/layers/FeatureLayer', 'esri/widgets/ScaleBar', 'esri/widgets/Compass',
       'esri/layers/support/Field', 'esri/PopupTemplate', 'esri/symbols/PictureMarkerSymbol',
       'esri/widgets/Home', 'esri/widgets/Legend', 'esri/widgets/LayerList', 'esri/widgets/Zoom',
-      'esri/widgets/Locate', 'esri/Viewpoint', 'esri/geometry/Circle',
+      'esri/widgets/Locate', 'esri/widgets/Expand', 'esri/Viewpoint', 'esri/geometry/Circle',
       'esri/symbols/SimpleFillSymbol', 'esri/tasks/support/Query', 'esri/geometry/support/webMercatorUtils',
       'esri/identity/IdentityManager', 'esri/identity/ServerInfo', 'esri/identity/Credential', 'esri/config'], options).then(
         (
           [
             Map, MapView, Graphic, Point, Extent, FeatureLayer, ScaleBar, Compass, Field, PopupTemplate,
-            PictureMarkerSymbol, Home, Legend, LayerList, Zoom, Locate, Viewpoint, Circle, SimpleFillSymbol, Query,
+            PictureMarkerSymbol, Home, Legend, LayerList, Zoom, Locate, Expand, Viewpoint, Circle, SimpleFillSymbol, Query,
             WebMercatorUtils, IdentityManager, ServerInfo, Credential, EsriConfig
           ]
         ) => {
@@ -145,7 +156,7 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
           this.FeatureLayer = FeatureLayer; this.ScaleBar = ScaleBar; this.Compass = Compass; this.Field = Field;
           this.PopupTemplate = PopupTemplate; this.PictureMarkerSymbol = PictureMarkerSymbol;
           this.Home = Home; this.Legend = Legend; this.LayerList = LayerList; this.Zoom = Zoom; this.Locate = Locate;
-          this.Viewpoint = Viewpoint; this.Circle = Circle;
+          this.Expand = Expand; this.Viewpoint = Viewpoint; this.Circle = Circle;
           this.SimpleFillSymbol = SimpleFillSymbol; this.Query = Query; this.WebMercatorUtils = WebMercatorUtils;
           this.IdentityManager = IdentityManager; this.ServerInfo = ServerInfo; this.Credential = Credential;
           this.EsriConfig = EsriConfig;
@@ -214,6 +225,8 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
 
     // let zoom = 7; // 7; // 6; // 5; // 4; // 3;
 
+    let zoom;
+
     let initialExtent = homeExtent;
 
     const savedExtent = this.getMapExtent();
@@ -222,6 +235,8 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
 
       initialExtent = savedExtent;
       // zoom = 0;
+    } else {
+      zoom = 7;
     }
 
     // const baseMap = 'streets-night-vector';
@@ -240,7 +255,7 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
       extent: initialExtent,
       // scale: scale,
       // spatialReference: { wkid: 4326 },
-      // zoom: zoom,
+      zoom: zoom,
       map: this.map,
       popup: {
         dockEnabled: false,
@@ -266,7 +281,7 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
 
     homeButton.viewpoint = homeViewPoint;
 
-    this.mapView.ui.add(homeButton, 'bottom-right');
+    this.mapView.ui.add(homeButton, 'top-left');
 
     this.mapView.ui.remove('zoom');
 
@@ -274,7 +289,7 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
       view: this.mapView
     });
 
-    this.mapView.ui.add(zoomButton, 'bottom-right');
+    this.mapView.ui.add(zoomButton, 'top-left');
 
     const locateButton = new this.Locate({
       view: this.mapView
@@ -304,7 +319,18 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
       view: this.mapView
     });
 
-    this.mapView.ui.add(layerList, 'top-right');
+    this.mapView.ui.add(layerList, 'bottom-right');
+
+    // this.editAssignmentExpand = new this.Expand({
+    //   expandIconClass: 'esri-icon-edit',
+    //   expandTooltip: 'Expand Edit',
+    //   expanded: true,
+    //   view: this.mapView,
+    //   content: this.editAssignmentContainer.nativeElement
+    // });
+
+    // this.mapView.ui.add(this.editAssignmentExpand, 'top-right');
+
 
     this.mapView.when(() => {
       console.log('map view loaded!');
@@ -358,9 +384,40 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
               this.highlightAssignment(objectId);
 
               const attributes = graphic.attributes;
+              const description = attributes.description;
+              const priority = attributes.priority;
+              const dueDate = attributes.dueDate;
               const notes = attributes.notes;
+              const status = attributes.status;
 
+              let priorityText;
+              switch (priority) {
+                case 0:
+                  priorityText = '<font color="green">None</font>';
+                  break;
+                case 1:
+                  priorityText = '<font color="blue">Low</font>';
+                  break;
+                case 2:
+                  priorityText = '<font color="yellow">Medium</font>';
+                  break;
+                case 3:
+                  priorityText = '<font color="orange">High</font>';
+                  break;
+                case 4:
+                  priorityText = '<font color="red">Critical</font>';
+                  break;
+              }
+
+              const date = new Date(dueDate);
+
+              const dueDateText = date.toLocaleString();
+
+              this.assignmentDescription.nativeElement.innerHTML = description;
+              this.assignmentPriority.nativeElement.innerHTML = priorityText;
+              this.assignmentDueDate.nativeElement.innerHTML = dueDateText;
               this.assignmentNotes.nativeElement.value = notes;
+              this.assignmentStatus.nativeElement.value = status;
 
               this.editAssignmentContainer.nativeElement.style.display = 'inline'; // 'block';
             }
@@ -403,8 +460,11 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
       this.editAssignmentContainer.nativeElement.style.display = 'none';
     }
 
+    this.assignmentDescription.nativeElement.innerHTML = null;
+    this.assignmentPriority.nativeElement.innerHTML = null;
+    this.assignmentDueDate.nativeElement.innerHTML = null;
     this.assignmentNotes.nativeElement.value = null;
-    // inputAssignmentCompleted.nativeElement.value = null;
+    this.assignmentStatus.nativeElement.value = null;
 
     this.mapView.graphics.removeAll();
   }
@@ -452,6 +512,7 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
 
     if (this.selectedAssignment) {
       this.selectedAssignment.attributes['notes'] = this.assignmentNotes.nativeElement.value;
+      this.selectedAssignment.attributes['status'] = this.assignmentStatus.nativeElement.value;
 
       const edits = {
         updateFeatures: [this.selectedAssignment]
@@ -467,6 +528,36 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
     this.workforceAssignmentsFeatureLayer.applyEdits(edits).then(results => {
       console.log('update assignment results', results);
       this.closeEditAssignmentWindow();
+
+      // ToDo: Wire up attachments to the assignment update window. - got here
+
+      // ToDo: Figure out how to refresh the updated feature layer
+      // without having to reload/readd it so we dont have duplicate
+      // layers
+
+      // this.workforceAssignmentsFeatureLayer.refresh();
+
+      // this.workforceAssignmentsFeatureLayer.load();
+
+      this.mapView.popup.close();
+
+      this.unhighlightAssignment();
+
+      // const temp = this.workforceAssignmentsFeatureLayer;
+
+      // this.removeLayer(this.workforceAssignmentsFeatureLayer);
+
+      // this.workforceAssignmentsFeatureLayer.visible = false;
+
+      this.loadWorkforceAssignments();
+
+      // const existingLayer = this.map.findLayerById(this.workforceAssignmentsFeatureLayer.id);
+      // if (existingLayer) {
+      //   console.log('existing layer', existingLayer);
+      //   existingLayer.refresh();
+      // }
+
+      // this.removeLayer(temp);
     }).catch((error) => {
       console.log('update assignment error', error);
     });
@@ -489,7 +580,7 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
           this.dcpGISTokenServiceUrl
         ).then((result) => {
           // alert('there');
-          this.loadDCPFeatureLayers(true, true, true, true);
+          this.loadDCPFeatureLayers(true, false, false, true);
         });
 
         this.authenticateUser(
@@ -498,17 +589,11 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
           this.demoWorkforceTokenServiceUrl
         ).then((result) => {
           // alert('there');
-          this.loadWorkforceFeatureLayers(true, true);
+          this.loadWorkforceFeatureLayers(false, true, true, true);
         });
         break;
       case 'gatekeeper-demo':
         // this.loadDCPFeatureLayers(true, true, true, true, true);
-        break;
-      case 'leaklog-demo':
-        // ToDo: wire up leak log demo that displays leaks on the map and allows
-        // a user to click on them, open a dialog box, enter details & attachments (logging details)
-        // and submit the edit back to the service/backend api 
-        // need to troll the portal for the leak api or request the url & creds from mark/catherine
         break;
     }
   }
@@ -735,15 +820,14 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
     }
   }
 
-  private loadWorkforceFeatureLayers = (loadWorkers?, loadAssignments?): void => {
-    // ToDo: Create asignments for dilton mingrim in workforce and verify his
-    // assignments are not displayed when logged in as Dalton;
-    // will we need to explicilty filter the assignments layer
-    // based on workerid (looked up based on email/username) or will it just happen
-    // natively? - got here
-
+  private loadWorkforceFeatureLayers = (loadDispatchers?, loadLocations?, loadWorkers?, loadAssignments?): void => {
     // this.loadWorkforceBaselayers();
-    // this.loadWorkforceDispatchers();
+    if (loadDispatchers) {
+      this.loadWorkforceDispatchers();
+    }
+    if (loadLocations) {
+      this.loadWorkforceLocations();
+    }
     if (loadWorkers) {
       this.loadWorkforceWorkers();
     }
@@ -1497,7 +1581,7 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
 
     console.log('pipelnes feature layer url', url);
 
-    // todo: wire up load time metrics for these methods
+    // ToDo: wire up load time metrics for these methods
     const featureLayer = new this.FeatureLayer({
       url: url,
       outFields: ['*'],
@@ -2087,6 +2171,190 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
     });
   }
 
+  private loadWorkforceLocations = (useGateKeeper?): void => {
+    this.showProgressBar();
+
+    let url = useGateKeeper ? this.azureGatekeeperServerUrl : this.demoWorkforceFeatureServiceUrl;
+    url += this.demoWorkforceLocationsRoute + this.locationsLayerIndex;
+
+    if (useGateKeeper) {
+      url += '?subscription-key=' + this.azureGatekeeperSubscriptionKey;
+    }
+
+    console.log('workforce locations feature layer url', url);
+
+    const featureLayer = new this.FeatureLayer({
+      url: url,
+      outFields: ['*'],
+      visible: true,
+      popupEnabled: true,
+      popupTemplate: { // autocasts as new PopupTemplate()
+        // title: "<font color='#008000'>DCP Meters</font>",
+        title: 'Location',
+
+        // Set content elements in the order to display.
+        // The first element displayed here is the fieldInfos.
+        content: [
+          {
+            // It is also possible to set the fieldInfos outside of the content
+            // directly in the popupTemplate. If no fieldInfos is specifically set
+            // in the content, it defaults to whatever may be set within the popupTemplate.
+            type: 'fields',
+            fieldInfos: [
+              {
+                fieldName: 'ACCURACY',
+                visible: true,
+                label: 'Accuracy',
+                format: {
+                  places: 0,
+                  digitSeparator: true
+                }
+              },
+              // {
+              //   fieldName: 'STATUS',
+              //   visible: true,
+              //   label: 'Status',
+              //   format: {
+              //     places: 0,
+              //     digitSeparator: true
+              //   }
+              // },
+              // {
+              //   fieldName: 'TITLE',
+              //   visible: true,
+              //   label: 'Title',
+              //   format: {
+              //     places: 0,
+              //     digitSeparator: true
+              //   }
+              // },
+              // {
+              //   fieldName: 'CONTACTNUMBER',
+              //   visible: true,
+              //   label: 'Contact Number',
+              //   format: {
+              //     places: 0,
+              //     digitSeparator: true
+              //   }
+              // },
+              // {
+              //   fieldName: 'USERID',
+              //   visible: true,
+              //   label: 'User Id',
+              //   format: {
+              //     places: 0,
+              //     digitSeparator: true
+              //   }
+              // },
+              // {
+              //   fieldName: 'NOTES',
+              //   visible: true,
+              //   label: 'Notes',
+              //   format: {
+              //     places: 0,
+              //     digitSeparator: true
+              //   }
+              // },
+              {
+                fieldName: 'CREATIONDATE',
+                visible: true,
+                label: 'Creation Date',
+                format: {
+                  places: 0,
+                  digitSeparator: true
+                }
+              },
+              {
+                fieldName: 'CREATOR',
+                visible: true,
+                label: 'Creator',
+                format: {
+                  places: 0,
+                  digitSeparator: true
+                }
+              },
+              {
+                fieldName: 'EDITDATE',
+                visible: true,
+                label: 'Edit Date',
+                format: {
+                  places: 0,
+                  digitSeparator: true
+                }
+              },
+              {
+                fieldName: 'EDITOR',
+                visible: true,
+                label: 'Editor',
+                format: {
+                  places: 0,
+                  digitSeparator: true
+                }
+              },
+            ]
+          },
+          //   {
+          //     // You can also set a descriptive text element. This element
+          //     // uses an attribute from the featurelayer which displays a
+          //     // sentence giving the total amount of trees value within a
+          //     // specified census block. Text elements can only be set within the content.
+          //     type: "text",
+          //     text: "There are {Point_Count} trees within census block {BLOCKCE10}"
+          //   },
+          //   {
+          //     // You can set a media element within the popup as well. This
+          //     // can be either an image or a chart. You specify this within
+          //     // the mediaInfos. The following creates a pie chart in addition
+          //     // to two separate images. The chart is also set up to work with
+          //     // related tables. Similar to text elements, media can only be set within the content.
+          //     type: "media",
+          //     mediaInfos: [
+          //       {
+          //         title: "<b>Count by type</b>",
+          //         type: "pie-chart",
+          //         caption: "",
+          //         value: {
+          //           theme: "Grasshopper",
+          //           fields: ["relationships/0/Point_Count_COMMON"],
+          //           normalizeField: null,
+          //           tooltipField: "relationships/0/COMMON"
+          //         }
+          //       },
+          //       {
+          //         title: "<b>Welcome to Beverly Hills</b>",
+          //         type: "image",
+          //         value: {
+          //           sourceURL: "https://www.beverlyhills.org/cbhfiles/storage/files/13203374121770673849/122707_039r_final.jpg"
+          //         }
+          //       },
+          //       {
+          //         title: "<b>Palm tree lined street</b>",
+          //         type: "image",
+          //         value: {
+          //           sourceURL: "https://cdn.loc.gov/service/pnp/highsm/21600/21679r.jpg"
+          //         }
+          //       }
+          //     ]
+          //   },
+          //   {
+          //     // You can set a attachment element(s) within the popup as well.
+          //     // Similar to text and media elements, attachments can only be set
+          //     // within the content. Any attachmentInfos associated with the feature
+          //     // will be listed in the popup.
+          //     type: "attachments"
+          //   }
+        ]
+      },
+    });
+
+    this.map.add(featureLayer);
+
+    featureLayer.when(() => {
+      console.log('workforce locations basemap feature layer loaded!');
+      this.hideProgressBar();
+    });
+  }
+
   private loadWorkforceAssignments = (useGateKeeper?): void => {
     this.showProgressBar();
 
@@ -2102,11 +2370,34 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
       url: url,
       outFields: ['*'],
       visible: true,
-      popupEnabled: true,
+      popupEnabled: false,
+      // dockEnabled: true,
+      // refreshInterval: 0.1,
       popupTemplate: { // autocasts as new PopupTemplate()
-        // title: "<font color='#008000'>DCP Meters</font>",
         title: 'Assignment',
-
+        //   // title: "<font color='#008000'>DCP Meters</font>",
+        //   title: 'Edit Assignment',
+        //   content: `<div #editAssignmentContainer id='editAssignmentContainer'>
+        //   <div id='attributeArea'>
+        //     <label for='assignmentStatus'>Status:</label>
+        //     <br>
+        //     <select #assignmentStatus id='assignmentStatus'>
+        //       <option value='0'>Unassigned</option>
+        //       <option value='1'>Assigned</option>
+        //       <option value='2'>In Progress</option>
+        //       <option value='3'>Completed</option>
+        //       <option value='4'>Declined</option>
+        //       <option value='5'>Paused</option>
+        //       <option value='6'>Canceled</option>
+        //     </select>
+        //     <br/>
+        //     <label for='assignmentNotes'>Notes:</label>
+        //     <br>
+        //     <textarea #assignmentNotes id='assignmentNotes' rows='10' cols='30'>Enter notes here</textarea>
+        //     <br>
+        //     <input #btnSave id='btnSave' type='button' class='edit-button' value='Save' (click)='saveAssignment();'>
+        //   </div>
+        // </div>`,
         // Set content elements in the order to display.
         // The first element displayed here is the fieldInfos.
         content: [
@@ -2357,12 +2648,29 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
       },
     });
 
+
     this.map.add(this.workforceAssignmentsFeatureLayer);
+
+    // if (this.workforceAssignmentsFeatureLayer) {
+    //   const existingLayer = this.map.findLayerById(this.workforceAssignmentsFeatureLayer.id);
+
+    //   if (existingLayer) {
+    //     alert(existingLayer.id);
+    //     // existingLayer = this.workforceAssignmentsFeatureLayer;
+    //     this.map.remove(existingLayer);
+    //   }
+    //   this.map.add(this.workforceAssignmentsFeatureLayer);
+    //   //alert(this.workforceAssignmentsFeatureLayer.id);
+    // }
 
     this.workforceAssignmentsFeatureLayer.when(() => {
       console.log('workforce workers basemap feature layer loaded!');
       this.hideProgressBar();
     });
+  }
+
+  private removeLayer = (layer): void => {
+    this.map.remove(layer);
   }
 
   private zoomToExtent = (extent): void => {

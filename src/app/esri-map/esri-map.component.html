@@ -1,14 +1,5 @@
-<!-- <script>
-  var dojoConfig = {
-    has: {
-      "esri-featurelayer-webgl": 1
-    }
-  };
-
-</script> -->
-
 <div #mapViewContainer>
-  <div *ngIf='userId' id="userId">
+  <div *ngIf='userId' id='userId'>
     <small>
       Signed in as:
       <b>{{userId}}</b>
@@ -17,24 +8,61 @@
   </div>
   <div #progressBar id='progressBar'></div>
 
-  <div #editAssignmentContainer id="editAssignmentContainer" style="display:none; margin-top: 1em;">
-    <div style='float: right; font-size: 16px; font-weight: bold; cursor: pointer;' (click)=closeEditAssignmentWindow();>X</div>
-    <h3 class="list-heading">Edit Assignment</h3>
+  <div #editAssignmentContainer id='editAssignmentContainer'>
+    <div style='float: right; font-size: 16px; font-weight: bold; cursor: pointer;' (click)='closeEditAssignmentWindow();'>X</div>
+    <h4 class='list-heading'>Edit Assignment</h4>
 
-    <div id="attributeArea">
-      <label for="assignmentNotes">Notes:</label>
+    <div id='attributeArea'>
+      <small>
+        <label for='assignmentDescription'>
+          <b>Description:</b>
+        </label>
+        <span #assignmentDescription id='assignmentDescription'></span>
+      </small>
+      <br/>
+      <br/>
+      <small>
+        <label for='assignmentDueDate'>
+          <b>Due Date:</b>
+        </label>
+        <span #assignmentDueDate id='assignmentDueDate'></span>
+      </small>
+      <br/>
+      <br/>
+      <small>
+        <label for='assignmentPriority'>
+          <b>Priority:</b>
+        </label>
+        <span #assignmentPriority id='assignmentPriority' style='background-color: lightgray;'></span>
+      </small>
+      <br/>
+      <br/>
+      <small>
+        <label for='assignmentStatus'>
+          <b>Status:</b>
+        </label>
+        <select #assignmentStatus id='assignmentStatus'>
+          <option value='0'>Unassigned</option>
+          <option value='1'>Assigned</option>
+          <option value='2'>In Progress</option>
+          <option value='3'>Completed</option>
+          <option value='4'>Declined</option>
+          <option value='5'>Paused</option>
+          <option value='6'>Canceled</option>
+        </select>
+      </small>
+      <br/>
+      <br/>
+      <small>
+        <label for='assignmentNotes'>
+          <b>Notes:</b>
+        </label>
+        <br>
+        <textarea #assignmentNotes id='assignmentNotes' rows='10' cols='30'>Enter notes here</textarea>
+      </small>
       <br>
-      <!-- <input #assignmentNotes id="assignmentNotes" class="inputInfo" type="text" placeHolder="Enter notes"> -->
-      <textarea #assignmentNotes id="assignmentNotes" rows="10" cols="30">Enter notes here</textarea>
-      <br>
-      <!-- <label for="inputUserInfo">Contact:</label>
-      <input class="inputInfo" required type="email" name="email" id="inputUserInfo" pattern="[^ @]*@[^ @]*"
-        placeHolder="Enter email address"><br> -->
-      <input #btnSave id="btnSave" type="button" class="edit-button" value="Save" (click)='saveAssignment();'>
+      <!-- <br/> -->
+      <input #btnSave id='btnSave' type='button' class='edit-button' value='Save' (click)='saveAssignment();'>
     </div>
-
-    <!-- <div id="deleteArea">
-      <input type="button" class="edit-button" value="Delete incident" id="btnDelete">
-    </div> -->
   </div>
 </div>

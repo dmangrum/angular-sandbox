@@ -29,5 +29,15 @@
   /* height: 34px;
   width: 224px; */
 }
-/* 
-// ToDo: Wire up assignment edit window styles here */
+
+#editAssignmentContainer {
+  font-family: Arial, Helvetica, sans-serif;
+  display: none;
+  padding: 10px;
+  background-color: white;
+  border: solid thick #f2f2f2;
+  position: absolute;
+  right: 20px;
+  top: 50px;
+  width: 275px;
+}
