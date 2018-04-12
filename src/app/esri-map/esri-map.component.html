@@ -6,42 +6,86 @@
       <button type='button' (click)='signOut();'>Sign Out</button>
     </small>
   </div>
+  <div *ngIf='processingData' class="spinner"></div>
   <div #progressBar id='progressBar'></div>
 
-  <div #editAssignmentContainer id='editAssignmentContainer'>
-    <div style='float: right; font-size: 16px; font-weight: bold; cursor: pointer;' (click)='closeEditAssignmentWindow();'>X</div>
-    <h4 class='list-heading'>Edit Assignment</h4>
-
-    <div id='attributeArea'>
+  <!-- Add Assignment Container -->
+  <div #addAssignmentContainer id='addAssignmentContainer'>
+    <div>
+      <div style='float: left;'>
+        <span>Add Assignment</span>
+      </div>
+      <div style='float: right; font-size: 16px; font-weight: bold; cursor: pointer;' (click)='closeAddAssignmentWindow();'>
+        <span>X</span>
+      </div>
+      <div style='clear: both;'></div>
+    </div>
+    <hr/>
+    <br/>
+    <div>
       <small>
-        <label for='assignmentDescription'>
+        <label for='addAssignmentType'>
+          <b>Assignment Type:</b>
+        </label>
+        <select #addAssignmentType id='addAssignmentType'>
+          <option value='0'>Leak Inspection</option>
+          <option value='1'>Valve Inspection</option>
+          <option value='2'>Pigging</option>
+        </select>
+      </small>
+      <br/>
+      <br/>
+      <small>
+        <label for='addAssignmentFeatureType'>
+          <b>Feature Type:</b>
+        </label>
+        <span #addAssignmentFeatureType id='addAssignmentFeatureType'></span>
+      </small>
+      <br/>
+      <br/>
+      <small>
+        <label for='addAssignmentFeatureId'>
+          <b>Feature Id:</b>
+        </label>
+        <span #addAssignmentFeatureId id='addAssignmentFeatureId'></span>
+      </small>
+      <br/>
+      <br/>
+      <small>
+        <label for='addAssignmentDescription'>
           <b>Description:</b>
         </label>
-        <span #assignmentDescription id='assignmentDescription'></span>
+        <textarea #addAssignmentDescription id='addAssignmentDescription' rows='10' cols='30'>Enter description here</textarea>
       </small>
       <br/>
       <br/>
       <small>
-        <label for='assignmentDueDate'>
+        <label for='addAssignmentDueDate'>
           <b>Due Date:</b>
         </label>
-        <span #assignmentDueDate id='assignmentDueDate'></span>
+        <input type='textbox' #addAssignmentDueDate id='addAssignmentDueDate'>
       </small>
       <br/>
       <br/>
       <small>
-        <label for='assignmentPriority'>
+        <label for='addAssignmentPriority'>
           <b>Priority:</b>
         </label>
-        <span #assignmentPriority id='assignmentPriority' style='background-color: lightgray;'></span>
+        <select #addAssignmentPriority id='addAssignmentPriority'>
+          <option value='0'>None</option>
+          <option value='1'>Low</option>
+          <option value='2'>Medium</option>
+          <option value='3'>High</option>
+          <option value='4'>Critical</option>
+        </select>
       </small>
       <br/>
       <br/>
       <small>
-        <label for='assignmentStatus'>
+        <label for='addAssignmentStatus'>
           <b>Status:</b>
         </label>
-        <select #assignmentStatus id='assignmentStatus'>
+        <select #addAssignmentStatus id='addAssignmentStatus'>
           <option value='0'>Unassigned</option>
           <option value='1'>Assigned</option>
           <option value='2'>In Progress</option>
@@ -54,15 +98,82 @@
       <br/>
       <br/>
       <small>
-        <label for='assignmentNotes'>
+        <label for='addAsignmentNotes'>
           <b>Notes:</b>
         </label>
         <br>
-        <textarea #assignmentNotes id='assignmentNotes' rows='10' cols='30'>Enter notes here</textarea>
+        <textarea #addAsignmentNotes id='addAsignmentNotes' rows='10' cols='30'>Enter notes here</textarea>
       </small>
       <br>
       <!-- <br/> -->
-      <input #btnSave id='btnSave' type='button' class='edit-button' value='Save' (click)='saveAssignment();'>
+      <input #btnSave id='btnCreate' type='button' value='Create' (click)='createAssignment();'>
+    </div>
+  </div>
+
+  <!-- Edit Assignment Container -->
+  <div #editAssignmentContainer id='editAssignmentContainer'>
+    <div>
+      <div style='float: left;'>
+        <span>Edit Assignment</span>
+      </div>
+      <div style='float: right; font-size: 16px; font-weight: bold; cursor: pointer;' (click)='closeEditAssignmentWindow();'>
+        <span>X</span>
+      </div>
+      <div style='clear: both;'></div>
+    </div>
+    <hr/>
+    <br/>
+    <div>
+      <small>
+        <label for='editAssignmentDescription'>
+          <b>Description:</b>
+        </label>
+        <span #editAssignmentDescription id='editAssignmentDescription'></span>
+      </small>
+      <br/>
+      <br/>
+      <small>
+        <label for='editAssignmentDueDate'>
+          <b>Due Date:</b>
+        </label>
+        <span #editAssignmentDueDate id='editAssignmentDueDate'></span>
+      </small>
+      <br/>
+      <br/>
+      <small>
+        <label for='editAssignmentPriority'>
+          <b>Priority:</b>
+        </label>
+        <span #editAssignmentPriority id='editAssignmentPriority' style='background-color: lightgray;'></span>
+      </small>
+      <br/>
+      <br/>
+      <small>
+        <label for='editAssignmentStatus'>
+          <b>Status:</b>
+        </label>
+        <select #editAssignmentStatus id='editAssignmentStatus'>
+          <option value='0'>Unassigned</option>
+          <option value='1'>Assigned</option>
+          <option value='2'>In Progress</option>
+          <option value='3'>Completed</option>
+          <option value='4'>Declined</option>
+          <option value='5'>Paused</option>
+          <option value='6'>Canceled</option>
+        </select>
+      </small>
+      <br/>
+      <br/>
+      <small>
+        <label for='editAssignmentNotes'>
+          <b>Notes:</b>
+        </label>
+        <br>
+        <textarea #editAssignmentNotes id='editAssignmentNotes' rows='10' cols='30'>Enter notes here</textarea>
+      </small>
+      <br>
+      <!-- <br/> -->
+      <input #btnSave id='btnUpdate' type='button' value='Update' (click)='updateAssignment();'>
     </div>
   </div>
 </div>
