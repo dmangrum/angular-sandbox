@@ -2372,7 +2372,7 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
       visible: true,
       popupEnabled: false,
       // dockEnabled: true,
-      // refreshInterval: 0.1,
+      refreshInterval: 0.1,
       popupTemplate: { // autocasts as new PopupTemplate()
         title: 'Assignment',
         //   // title: "<font color='#008000'>DCP Meters</font>",
