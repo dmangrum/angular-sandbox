@@ -409,6 +409,13 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
         this.addAssignmentContainer.nativeElement.style.display = 'none';
         this.addAssignmentFeatureType.nativeElement.innerHTML = null;
         this.addAssignmentFeatureId.nativeElement.innerHTML = null;
+
+        this.addAssignmentType.nativeElement.value = 0;
+        this.addAssignmentStatus.nativeElement.value = 0;
+        this.addAssignmentDescription.nativeElement.value = null;
+        this.addAssignmentDueDate.nativeElement.value = null;
+        this.addAssignmentNotes.nativeElement.value = null;
+        this.addAssignmentPriority.nativeElement.value = 0;
       }
 
       this.mapView.hitTest(event.screenPoint).then(response => {
@@ -629,6 +636,7 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
             // alert(featureId);
 
             if (featureId) {
+              // ToDo: Remove these display fields once we've added logic to prepopulate the description with these values. - got here
               this.addAssignmentFeatureType.nativeElement.innerHTML = featureType;
               this.addAssignmentFeatureId.nativeElement.innerHTML = featureId;
 
@@ -721,20 +729,29 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
     console.log('creating assignment...');
 
     if (this.selectedFeature) {
-      // const assignmentPoint = new this.Point({
+      const assignmentLocation = this.selectedFeature.geometry.clone();
+      assignmentLocation.z = undefined;
+      assignmentLocation.hasZ = false;
+
+      // ToDo Wire up logic to prefill the description field with
+      // pertinent feature information (e.g. Meter Number, Meter Name, Meter Status, etc.) - got here
+
+      // const assignmentLocation = new this.Point({
       //   x: this.selectedFeature.geometry.x,
-      //   y: this.selectedFeature.geometry.y
+      //   y: this.selectedFeature.geometry.y,
+      //   z: undefined,
+      //   hasZ: false
       // });
 
-      const assignmentPoint = this.mapPoint.clone();
-      assignmentPoint.z = undefined;
-      assignmentPoint.hasZ = false;
+      // const assignmentLocation = this.mapPoint.clone();
+      // assignmentLocation.z = undefined;
+      // assignmentLocation.hasZ = false;
 
-      // alert(assignmentPoint.x);
-      // alert(assignmentPoint.y);
+      // alert(assignmentLocation.x);
+      // alert(assignmentLocation.y);
 
       const newAssignment = new this.Graphic({
-        geometry: assignmentPoint,
+        geometry: assignmentLocation,
         attributes: {}
       });
 
@@ -785,6 +802,8 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
   private updateAssignmentLayer(edits) {
     // this.unhighlightAssignment();
     console.log('updating asssignment layer...');
+
+    // ToDo: Wire up assignment location to the edit assignment window. - got here
 
     this.workforceAssignmentsFeatureLayer.applyEdits(edits).then(results => {
       console.log('update assignment layer results', results);
