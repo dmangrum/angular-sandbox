@@ -26,6 +26,12 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
   @ViewChild('addAssignmentContainer') addAssignmentContainer: ElementRef;
   @ViewChild('addAssignmentFeatureType') addAssignmentFeatureType: ElementRef;
   @ViewChild('addAssignmentFeatureId') addAssignmentFeatureId: ElementRef;
+  @ViewChild('addAssignmentType') addAssignmentType: ElementRef;
+  @ViewChild('addAssignmentDescription') addAssignmentDescription: ElementRef;
+  @ViewChild('addAssignmentDueDate') addAssignmentDueDate: ElementRef;
+  @ViewChild('addAssignmentPriority') addAssignmentPriority: ElementRef;
+  @ViewChild('addAssignmentStatus') addAssignmentStatus: ElementRef;
+  @ViewChild('addAssignmentNotes') addAssignmentNotes: ElementRef;
 
   private Map: any;
   private Basemap: any;
@@ -117,10 +123,17 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
   private readonly locationsLayerIndex = 0;
 
   private dcpMetersFeatureLayer: any;
+  private dcpBoostersFeatureLayer: any;
+  private dcpPlantsFeatureLayer: any;
+  private dcpPipelinesFeatureLayer: any;
+
+  private selectedFeature: any;
 
   private workforceAssignmentsFeatureLayer: any;
   private selectedAssignment: any;
   // private editAssignmentExpand: any;
+
+  private mapPoint: any;
 
   // ToDo: Wire up show all assignments, show only my assignments toggle control, along with complete assignment checkbox
 
@@ -425,7 +438,7 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
           console.log('non-assignment feature', nonAssignmentFeature);
 
           let graphic;
-          let objectId;
+          // let objectId;
 
           if (assignmentFeature) {
             // Process Assignment Features - Open Window for Editing Assignment
@@ -433,18 +446,18 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
 
             // alert(graphic.layer.title);
 
-            objectId = graphic.attributes[this.workforceAssignmentsFeatureLayer.objectIdField];
+            const objectId = graphic.attributes[this.workforceAssignmentsFeatureLayer.objectIdField];
+
+            // alert(objectId);
 
             if (objectId) {
               const query = this.workforceAssignmentsFeatureLayer.createQuery();
               query.where = this.workforceAssignmentsFeatureLayer.objectIdField + ' = ' + objectId;
 
               this.workforceAssignmentsFeatureLayer.queryFeatures(query).then(results => {
-                console.log('query results', results);
+                console.log('workforce assignments feature layer query results', results);
                 if (results.features.length > 0) {
                   const feature = results.features[0];
-                  // const attributes = feature.attributes;
-                  // const notes = attributes.notes;
 
                   this.selectedAssignment = feature;
 
@@ -495,78 +508,129 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
           } else if (nonAssignmentFeature) {
             // Process Non-Assignment Features - Open Window for Adding Assignment
             graphic = nonAssignmentFeature.graphic;
+            this.mapPoint = nonAssignmentFeature.mapPoint;
 
-            // ToDo: Wire up global feature layer variables so we can dynamically access their properties here
-
-            const layerTitle = graphic.layer.title;
+            // const layerTitle = graphic.layer.title;
             // alert(layerTitle);
+
+            const layerId = graphic.layer.id;
+            // alert(layerId);
+
+            // alert(graphic.layer.id);
+            // alert(this.dcpMetersFeatureLayer.id);
 
             let featureType;
             let featureId;
+            let query;
 
-            if (layerTitle.toLowerCase().includes('meter')) {
-              // alert('meter');
-              featureType = 'Meter';
-              featureId = graphic.attributes['METER_NUMBER'];
-            } else if (layerTitle.toLowerCase().includes('pipeline')) {
-              // alert('pipeline');
-              featureType = 'Pipeline';
-              featureId = graphic.attributes['LINE_ID'];
-            } else if (layerTitle.toLowerCase().includes('booster')) {
-              // alert('booster');
-              featureType = 'Booster';
-              featureId = graphic.attributes['BOOSTER_ID'];
-            } else if (layerTitle.toLowerCase().includes('plant')) {
-              // alert('plant');
-              featureType = 'Plant';
-              featureId = graphic.attributes['PLANT_ID'];
+            switch (layerId) {
+              case this.dcpMetersFeatureLayer.id:
+                featureType = 'Meter';
+                featureId = graphic.attributes[this.dcpMetersFeatureLayer.displayField];
+
+                query = this.dcpMetersFeatureLayer.createQuery();
+                query.where = this.dcpMetersFeatureLayer.displayField + ' = \'' + featureId + '\'';
+
+                this.dcpMetersFeatureLayer.queryFeatures(query).then(results => {
+                  console.log('dcp meters feature layer query results', results);
+                  if (results.features.length > 0) {
+                    const feature = results.features[0];
+
+                    // feature.geometry = this.WebMercatorUtils.project(feature.geometry, { wkid: 4326 });
+                    // feature.geometry = this.WebMercatorUtils.webMercatorToGeographic(feature.geometry);
+                    feature.geometry = this.WebMercatorUtils.geographicToWebMercator(feature.geometry);
+
+                    this.selectedFeature = feature;
+
+                    console.log('selected feature', this.selectedFeature);
+
+                    this.highlightFeature(this.selectedFeature);
+                  }
+                });
+
+                break;
+              case this.dcpPipelinesFeatureLayer.id:
+                featureType = 'Pipeline';
+                featureId = graphic.attributes[this.dcpPipelinesFeatureLayer.displayField];
+
+                query = this.dcpPipelinesFeatureLayer.createQuery();
+                query.where = this.dcpPipelinesFeatureLayer.displayField + ' = \'' + featureId + '\'';
+
+                this.dcpPipelinesFeatureLayer.queryFeatures(query).then(results => {
+                  console.log('dcp pipelines feature layer query results', results);
+                  if (results.features.length > 0) {
+                    const feature = results.features[0];
+
+                    // feature.geometry = this.WebMercatorUtils.project(feature.geometry, { wkid: 4326 });
+                    // feature.geometry = this.WebMercatorUtils.webMercatorToGeographic(feature.geometry);
+                    feature.geometry = this.WebMercatorUtils.geographicToWebMercator(feature.geometry);
+
+                    this.selectedFeature = feature;
+
+                    console.log('selected feature', this.selectedFeature);
+
+                    this.highlightFeature(this.selectedFeature);
+                  }
+                });
+
+                break;
+              case this.dcpBoostersFeatureLayer.id:
+                featureType = 'Booster';
+                featureId = graphic.attributes[this.dcpBoostersFeatureLayer.displayField];
+
+                query = this.dcpBoostersFeatureLayer.createQuery();
+                query.where = this.dcpBoostersFeatureLayer.displayField + ' = \'' + featureId + '\'';
+
+                this.dcpBoostersFeatureLayer.queryFeatures(query).then(results => {
+                  console.log('dcp boosters feature layer query results', results);
+                  if (results.features.length > 0) {
+                    const feature = results.features[0];
+
+                    // feature.geometry = this.WebMercatorUtils.project(feature.geometry, { wkid: 4326 });
+                    // feature.geometry = this.WebMercatorUtils.webMercatorToGeographic(feature.geometry);
+                    feature.geometry = this.WebMercatorUtils.geographicToWebMercator(feature.geometry);
+
+                    this.selectedFeature = feature;
+
+                    console.log('selected feature', this.selectedFeature);
+
+                    this.highlightFeature(this.selectedFeature);
+                  }
+                });
+
+                break;
+              case this.dcpPlantsFeatureLayer.id:
+                featureType = 'Plant';
+                featureId = graphic.attributes[this.dcpPlantsFeatureLayer.displayField];
+
+                query = this.dcpPlantsFeatureLayer.createQuery();
+                query.where = this.dcpPlantsFeatureLayer.displayField + ' = \'' + featureId + '\'';
+
+                this.dcpPlantsFeatureLayer.queryFeatures(query).then(results => {
+                  console.log('dcp plants feature layer query results', results);
+                  if (results.features.length > 0) {
+                    const feature = results.features[0];
+
+                    // feature.geometry = this.WebMercatorUtils.project(feature.geometry, { wkid: 4326 });
+                    // feature.geometry = this.WebMercatorUtils.webMercatorToGeographic(feature.geometry);
+                    feature.geometry = this.WebMercatorUtils.geographicToWebMercator(feature.geometry);
+
+                    this.selectedFeature = feature;
+
+                    console.log('selected feature', this.selectedFeature);
+
+                    this.highlightFeature(this.selectedFeature);
+                  }
+                });
+
+                break;
             }
 
-            if (featureType && featureId) {
+            // alert(featureId);
+
+            if (featureId) {
               this.addAssignmentFeatureType.nativeElement.innerHTML = featureType;
               this.addAssignmentFeatureId.nativeElement.innerHTML = featureId;
-
-              // objectId = graphic.attributes['OBJECTID'];
-              // alert(objectId);
-
-              // if (objectId) {
-              // this.highlightAssignment(objectId);
-
-              // const attributes = graphic.attributes;
-              // const description = attributes.description;
-              // const priority = attributes.priority;
-              // const dueDate = attributes.dueDate;
-              // const notes = attributes.notes;
-              // const status = attributes.status;
-
-              // let priorityText;
-              // switch (priority) {
-              //   case 0:
-              //     priorityText = '<font color="green">None</font>';
-              //     break;
-              //   case 1:
-              //     priorityText = '<font color="blue">Low</font>';
-              //     break;
-              //   case 2:
-              //     priorityText = '<font color="yellow">Medium</font>';
-              //     break;
-              //   case 3:
-              //     priorityText = '<font color="orange">High</font>';
-              //     break;
-              //   case 4:
-              //     priorityText = '<font color="red">Critical</font>';
-              //     break;
-              // }
-
-              // const date = new Date(dueDate);
-
-              // const dueDateText = date.toLocaleString();
-
-              // this.assignmentDescription.nativeElement.innerHTML = description;
-              // this.assignmentPriority.nativeElement.innerHTML = priorityText;
-              // this.assignmentDueDate.nativeElement.innerHTML = dueDateText;
-              // this.assignmentNotes.nativeElement.value = notes;
-              // this.assignmentStatus.nativeElement.value = status;
 
               this.addAssignmentContainer.nativeElement.style.display = 'inline'; // 'block';
             }
@@ -656,17 +720,47 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
   public createAssignment() {
     console.log('creating assignment...');
 
-    alert('assignment created!');
-    // if (this.selectedAssignment) {
-    //   this.selectedAssignment.attributes['notes'] = this.assignmentNotes.nativeElement.value;
-    //   this.selectedAssignment.attributes['status'] = this.assignmentStatus.nativeElement.value;
+    if (this.selectedFeature) {
+      // const assignmentPoint = new this.Point({
+      //   x: this.selectedFeature.geometry.x,
+      //   y: this.selectedFeature.geometry.y
+      // });
 
-    //   const edits = {
-    //     updateFeatures: [this.selectedAssignment]
-    //   };
+      const assignmentPoint = this.mapPoint.clone();
+      assignmentPoint.z = undefined;
+      assignmentPoint.hasZ = false;
 
-    //   this.updateAssignment(edits);
-    // }
+      // alert(assignmentPoint.x);
+      // alert(assignmentPoint.y);
+
+      const newAssignment = new this.Graphic({
+        geometry: assignmentPoint,
+        attributes: {}
+      });
+
+      // what else is needed to create the record in the assingments layer? - tbd
+      newAssignment.attributes['assignmentType'] = this.addAssignmentType.nativeElement.value;
+      newAssignment.attributes['status'] = this.addAssignmentStatus.nativeElement.value;
+      newAssignment.attributes['description'] = this.addAssignmentDescription.nativeElement.value;
+      newAssignment.attributes['dueDate'] = this.addAssignmentDueDate.nativeElement.value;
+      newAssignment.attributes['notes'] = this.addAssignmentNotes.nativeElement.value;
+      newAssignment.attributes['priority'] = this.addAssignmentPriority.nativeElement.value;
+      newAssignment.attributes['workerId'] = 1; // wire up code to dynamically determine this value
+      // wire this property up to the add assignments window as a select list (Dalton = 1, Dilton = 2)
+      newAssignment.attributes['workOrderId'] = 1;
+      newAssignment.attributes['dispatcherId'] = 1; // wire up code to dynamically determine this value
+      newAssignment.attributes['location'] = 'Test Location'; // wire up code to reverse geocode the map point into an address
+      newAssignment.attributes['assignedDate'] = new Date().toLocaleString();
+      newAssignment.attributes['assignmentRead'] = 0;
+
+      console.log('new assignment', newAssignment);
+
+      const edits = {
+        addFeatures: [newAssignment]
+      };
+
+      this.updateAssignmentLayer(edits);
+    }
 
     this.closeAddAssignmentWindow();
   }
@@ -682,6 +776,8 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
         updateFeatures: [this.selectedAssignment]
       };
 
+      // ToDo: Wire up attachments to the assignment update window. - got here
+      // ToDO: Wire up "acknowledge" checkbox to the assignment update window that maps to assignmentRead attribute. - got here
       this.updateAssignmentLayer(edits);
     }
   }
@@ -692,10 +788,12 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
 
     this.workforceAssignmentsFeatureLayer.applyEdits(edits).then(results => {
       console.log('update assignment layer results', results);
+      this.closeAddAssignmentWindow();
       this.closeEditAssignmentWindow();
+      this.removeHighlightedFeatures();
+      this.mapView.popup.close();
 
-      // ToDo: Wire up attachments to the assignment update window. - got here
-
+      ////////////////////////////////////////////////////////////////
       // ToDo: Figure out how to refresh the updated feature layer
       // without having to reload/readd it so we dont have duplicate
       // layers
@@ -704,9 +802,6 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
 
       // this.workforceAssignmentsFeatureLayer.load();
 
-      this.mapView.popup.close();
-
-      this.removeHighlightedFeatures();
 
       // const temp = this.workforceAssignmentsFeatureLayer;
 
@@ -723,6 +818,7 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
       // }
 
       // this.removeLayer(temp);
+      ////////////////////////////////////////////////////////////////
     }).catch((error) => {
       console.log('update assignment error', error);
     });
@@ -1264,7 +1360,7 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
 
     console.log('plants feature layer url', url);
 
-    const featureLayer = new this.FeatureLayer({
+    this.dcpPlantsFeatureLayer = new this.FeatureLayer({
       url: url,
       outFields: ['*'],
       visible: true,
@@ -1380,9 +1476,9 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
       },
     });
 
-    this.map.add(featureLayer, this.plantLayerIndex);
+    this.map.add(this.dcpPlantsFeatureLayer, this.plantLayerIndex);
 
-    featureLayer.when(() => {
+    this.dcpPlantsFeatureLayer.when(() => {
       console.log('dcp plants feature layer loaded!');
       // this.toggleLayerVisibility(featureLayer, true);
       // this.hideProgressBar();
@@ -1406,7 +1502,7 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
 
     console.log('booster feature layer url', url);
 
-    const featureLayer = new this.FeatureLayer({
+    this.dcpBoostersFeatureLayer = new this.FeatureLayer({
       url: url,
       outFields: ['*'],
       visible: true,
@@ -1522,9 +1618,9 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
       },
     });
 
-    this.map.add(featureLayer, this.boosterLayerIndex);
+    this.map.add(this.dcpBoostersFeatureLayer, this.boosterLayerIndex);
 
-    featureLayer.when(() => {
+    this.dcpBoostersFeatureLayer.when(() => {
       console.log('dcp boosters feature layer loaded!');
       // this.toggleLayerVisibility(featureLayer, true);
       // this.hideProgressBar();
@@ -1939,7 +2035,7 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
     console.log('pipelnes feature layer url', url);
 
     // ToDo: wire up load time metrics for these methods
-    const featureLayer = new this.FeatureLayer({
+    this.dcpPipelinesFeatureLayer = new this.FeatureLayer({
       url: url,
       outFields: ['*'],
       visible: true,
@@ -2068,9 +2164,9 @@ export class EsriMapComponent implements OnInit, AfterViewInit, OnChanges, OnDes
       },
     });
 
-    this.map.add(featureLayer, this.pipelineLayerIndex);
+    this.map.add(this.dcpPipelinesFeatureLayer, this.pipelineLayerIndex);
 
-    featureLayer.when(() => {
+    this.dcpPipelinesFeatureLayer.when(() => {
       console.log('dcp pipelines feature layer loaded!');
       // this.toggleLayerVisibility(featureLayer, true);
       // this.hideProgressBar();
